@@ -13,7 +13,7 @@ const CATEGORY_ACCENTS: Record<string, string> = {
 };
 
 function getGameAccent(game: Game): string {
-  return CATEGORY_ACCENTS[game.category] ?? CATEGORY_ACCENTS.default;
+  return game.accentColor || CATEGORY_ACCENTS[game.category] || CATEGORY_ACCENTS.default;
 }
 
 export function HeroSection({ title, subtitle, cta, announcement, games }: { title: string; subtitle: string; cta: string; announcement: string; games: Game[] }) {

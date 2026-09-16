@@ -76,7 +76,7 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
   const selectedGame = games.find((item) => item.title === game);
   const isGenerals = selectedGame?.id === "generals-zero-hour";
   const availableModes = isGenerals ? GENERALS_MODES : MODES;
-  const getAccent = (item: Game) => CATEGORY_ACCENTS[item.category] ?? CATEGORY_ACCENTS.default;
+  const getAccent = (item: Game) => item.accentColor || CATEGORY_ACCENTS[item.category] || CATEGORY_ACCENTS.default;
 
   async function verifySubscription() {
     setCheckingSubscription(true);

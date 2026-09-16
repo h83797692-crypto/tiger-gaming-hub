@@ -40,11 +40,14 @@ protocol-less pastes, and bare 11-character IDs, while ignoring extra query
 params. `?t=90` / `?t=1m30s` start offsets are carried into the embed.
 The admin pastes a URL; the ID is derived on save — no manual thumbnail entry.
 
-### Image URL-or-upload toggle
-`components/admin/ImageField.tsx` is a tab switch between **رفع ملف**
-(upload to `/api/media/upload`) and **لصق رابط** (plain URL input). Both write
-to the same field. Used by game images, tier icons, player avatars, video
-files, and the hero image.
+### Cloud media uploads
+`components/admin/ImageField.tsx` is a tab switch between **رفع ملف** and
+**لصق رابط**. File uploads are sent to Cloudinary through
+`/api/media/upload`, then the returned permanent `secure_url` is stored in
+MongoDB. No uploaded media is written to the local `public` directory, so the
+flow is compatible with Vercel's read-only filesystem. Configure
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in
+`.env.local` and in the Vercel project environment settings.
 
 ### RTL
 `dir="rtl"` is set at the root layout, and **every rule in `globals.css` uses
@@ -76,7 +79,7 @@ under `app/api/`, and a server component page plus an admin form.
 
 ```bash
 npm install
-cp .env.example .env.local     # then fill in MONGODB_URI and NEXTAUTH_SECRET
+cp .env.example .env.local     # fill in MongoDB, NextAuth, and Cloudinary values
 npm run seed                   # creates the first admin user
 npm run dev                    # http://localhost:3001
 ```

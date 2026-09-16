@@ -93,7 +93,7 @@ export function ImageField({
               if (file) handleFile(file);
             }}
           />
-          {uploading && <span className="admin-subtle">جارٍ رفع الملف إلى السلة المحلية…</span>}
+          {uploading && <span className="admin-subtle">جارٍ رفع الملف إلى التخزين السحابي…</span>}
         </div>
       ) : (
         <input

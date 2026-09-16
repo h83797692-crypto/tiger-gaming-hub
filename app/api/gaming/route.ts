@@ -4,6 +4,11 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getGamingContent, updateGamingContent } from "@/lib/gaming-content";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const methodHeaders = { Allow: "GET, PUT, OPTIONS" };
+
 const raritySchema = z.enum(["common", "rare", "legendary"]).default("common");
 
 const matchSchema = z.object({
@@ -81,37 +86,70 @@ const gamingSchema = z.object({
 });
 
 export async function GET() {
-  return NextResponse.json(await getGamingContent());
+  try {
+    return NextResponse.json(await getGamingContent(), { headers: methodHeaders });
+  } catch (error) {
+    console.error("Failed to load gaming content", error);
+    return NextResponse.json(
+      { error: "Failed to load gaming content" },
+      { status: 500, headers: methodHeaders }
+    );
+  }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: methodHeaders });
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let session;
+  try {
+    session = await getServerSession(authOptions);
+  } catch (error) {
+    console.error("Failed to read admin session", error);
+    return NextResponse.json(
+      { error: "Unable to verify admin session" },
+      { status: 500, headers: methodHeaders }
+    );
+  }
+
+  if (!session) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: methodHeaders }
+    );
+  }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid JSON request body" },
+      { status: 400, headers: methodHeaders }
+    );
   }
 
   const parsed = gamingSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid gaming content", details: parsed.error.flatten() },
-      { status: 400 }
+      { status: 400, headers: methodHeaders }
     );
   }
 
   try {
     // youtubeId is re-derived from youtubeUrl inside updateGamingContent.
     const savedContent = await updateGamingContent(parsed.data);
-    return NextResponse.json({ success: true, content: savedContent });
+    return NextResponse.json(
+      { success: true, content: savedContent },
+      { headers: methodHeaders }
+    );
   } catch (error) {
     console.error("Failed to save gaming content", error);
     return NextResponse.json(
       { error: "Failed to save gaming content" },
-      { status: 500 }
+      { status: 500, headers: methodHeaders }
     );
   }
 }

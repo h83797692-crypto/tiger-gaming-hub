@@ -7,7 +7,6 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Toaster } from "sonner";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { DonationButton } from "@/components/DonationButton";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"], variable: "--font-cairo", display: "swap" });
 const chakra = Chakra_Petch({ subsets: ["latin"], variable: "--font-chakra", display: "swap", weight: ["500", "600", "700"] });
@@ -36,7 +35,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="ar" dir="rtl" className={`dark ${cairo.variable} ${chakra.variable}`}>
       <body className="min-h-screen font-sans antialiased">
         <AnimatedBackground />
-        <DonationButton />
         <Header siteName={content.brand} socialLinks={siteContent.socialLinks} />
         {children}
         <Footer siteName={content.brand} slogan={content.heroSubtitle} socialLinks={siteContent.socialLinks} />

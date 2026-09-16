@@ -24,7 +24,7 @@ const roundSchema = z.object({
 });
 
 const optionalGameText = z.preprocess(
-  (value) => (typeof value === "string" ? value : value == null ? "" : value),
+  (value) => (typeof value === "string" ? value.trim() : value == null ? "" : value),
   z.string().max(1000).default("")
 );
 

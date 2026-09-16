@@ -17,14 +17,16 @@ export function ImageField({
   onChange,
   accept = "image/png,image/jpeg,image/webp,image/svg+xml",
   preview = true,
+  allowUpload = true,
 }: {
   label: string;
   value: string;
   onChange: (url: string) => void;
   accept?: string;
   preview?: boolean;
+  allowUpload?: boolean;
 }) {
-  const [mode, setMode] = useState<Mode>(value ? (value.startsWith("/uploads/") || value.startsWith("blob:") ? "upload" : "url") : "upload");
+  const [mode, setMode] = useState<Mode>(allowUpload && value ? (value.startsWith("/uploads/") || value.startsWith("blob:") ? "upload" : "url") : "url");
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -55,28 +57,30 @@ export function ImageField({
     <div className="admin-field">
       <label>{label}</label>
 
-      <div className="toggle-tabs" role="tablist" aria-label={label}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "upload"}
-          className={mode === "upload" ? "toggle-tab is-active" : "toggle-tab"}
-          onClick={() => setMode("upload")}
-        >
-          رفع ملف
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "url"}
-          className={mode === "url" ? "toggle-tab is-active" : "toggle-tab"}
-          onClick={() => setMode("url")}
-        >
-          لصق رابط
-        </button>
-      </div>
+      {allowUpload && (
+        <div className="toggle-tabs" role="tablist" aria-label={label}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "upload"}
+            className={mode === "upload" ? "toggle-tab is-active" : "toggle-tab"}
+            onClick={() => setMode("upload")}
+          >
+            رفع ملف
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "url"}
+            className={mode === "url" ? "toggle-tab is-active" : "toggle-tab"}
+            onClick={() => setMode("url")}
+          >
+            لصق رابط
+          </button>
+        </div>
+      )}
 
-      {mode === "upload" ? (
+      {allowUpload && mode === "upload" ? (
         <div className="space-y-2">
           <input
             ref={inputRef}

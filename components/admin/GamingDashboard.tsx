@@ -303,7 +303,8 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
 
               <ImageField
                 label="أيقونة اللعبة"
-                value={game.iconUrl || game.imageUrl}
+                value={game.iconUrl}
+                allowUpload={false}
                 onChange={(url) =>
                   update("games", replaceAt(data.games, index, (g) => ({ ...g, iconUrl: url })))
                 }

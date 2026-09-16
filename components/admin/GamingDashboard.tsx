@@ -118,6 +118,14 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
         throw new Error(payload.error ?? "تعذر الحفظ");
       }
 
+      if (!payload.success) {
+        throw new Error("تعذر تأكيد حفظ التغييرات");
+      }
+
+      if (payload.content) {
+        setData(payload.content as GamingContent);
+      }
+
       toast.success("تم حفظ إعدادات Tiger Gaming بنجاح ✅");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر الحفظ");

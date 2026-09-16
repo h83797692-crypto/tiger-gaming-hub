@@ -23,6 +23,23 @@ const roundSchema = z.object({
   matches: z.array(matchSchema).max(64),
 });
 
+const optionalGameText = z.preprocess(
+  (value) => (typeof value === "string" ? value : value == null ? "" : value),
+  z.string().max(1000).default("")
+);
+
+const gameSchema = z.object({
+  id: z.string().min(1).max(160),
+  title: z.string().max(120),
+  category: z.string().max(80),
+  platform: z.string().max(80),
+  imageUrl: optionalGameText,
+  iconUrl: optionalGameText,
+  accentColor: z.string().max(20).optional().default(""),
+  rules: z.string().max(500),
+  rarity: raritySchema,
+});
+
 const gamingSchema = z.object({
   brand: z.string().min(1).max(80),
   heroTitle: z.string().max(200),
@@ -31,21 +48,7 @@ const gamingSchema = z.object({
   announcement: z.string().max(240),
   aboutTitle: z.string().max(120),
   aboutBody: z.string().max(2000),
-  games: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        title: z.string().max(120),
-        category: z.string().max(80),
-        platform: z.string().max(80),
-        imageUrl: z.string().max(1000),
-        iconUrl: z.string().max(1000).default(""),
-        accentColor: z.string().max(20).optional(),
-        rules: z.string().max(500),
-        rarity: raritySchema,
-      })
-    )
-    .max(60),
+  games: z.array(gameSchema).max(60),
   tournaments: z
     .array(
       z.object({
@@ -85,7 +88,14 @@ export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const parsed = gamingSchema.safeParse(await req.json().catch(() => null));
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON request body" }, { status: 400 });
+  }
+
+  const parsed = gamingSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid gaming content", details: parsed.error.flatten() },
@@ -93,6 +103,15 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  // youtubeId is re-derived from youtubeUrl inside updateGamingContent.
-  return NextResponse.json(await updateGamingContent(parsed.data));
+  try {
+    // youtubeId is re-derived from youtubeUrl inside updateGamingContent.
+    const savedContent = await updateGamingContent(parsed.data);
+    return NextResponse.json({ success: true, content: savedContent });
+  } catch (error) {
+    console.error("Failed to save gaming content", error);
+    return NextResponse.json(
+      { error: "Failed to save gaming content" },
+      { status: 500 }
+    );
+  }
 }

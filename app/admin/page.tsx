@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic';import { getGamingContent } from "@/lib/gaming-content";
+import { getGamingContent } from "@/lib/gaming-content";
 import { getLeaderboard } from "@/lib/leaderboard-content";
 import { getSocialSettings } from "@/lib/settings";
 import { AdminDashboardTabs } from "@/components/admin/AdminDashboardTabs";

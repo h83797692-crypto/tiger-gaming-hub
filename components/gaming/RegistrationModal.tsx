@@ -8,6 +8,14 @@ import type { Game, Tournament } from "@/lib/gaming-content";
 type Mode = "solo" | "duo" | "trio" | "squad" | "ffa";
 type Faction = "usa" | "china" | "gla" | "random";
 
+const CATEGORY_ACCENTS: Record<string, string> = {
+  FPS: "#00f0ff",
+  "Battle Royale": "#ff4d9d",
+  RTS: "#7c5cff",
+  Sports: "#ffb800",
+  default: "#00f0ff",
+};
+
 const MODES: { value: Mode; label: string; detail: string }[] = [
   { value: "solo", label: "Solo 1v1", detail: "لاعب واحد" },
   { value: "duo", label: "Duo 2v2", detail: "فريق ثنائي" },
@@ -68,6 +76,7 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
   const selectedGame = games.find((item) => item.title === game);
   const isGenerals = selectedGame?.id === "generals-zero-hour";
   const availableModes = isGenerals ? GENERALS_MODES : MODES;
+  const getAccent = (item: Game) => CATEGORY_ACCENTS[item.category] ?? CATEGORY_ACCENTS.default;
 
   async function verifySubscription() {
     setCheckingSubscription(true);
@@ -150,7 +159,32 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
           <fieldset className="registration-field flex flex-col gap-2">
             <legend className="registration-label">اختيار اللعبة</legend>
             <div className="game-selector grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {games.map((item) => <button disabled={!youtubeVerified} type="button" key={item.id} className={item.title === game ? "game-option is-selected" : "game-option"} aria-pressed={item.title === game} onClick={() => { setGame(item.title); if (item.id !== "generals-zero-hour") setFaction("random"); }}>{item.title}<small>{item.category} <span aria-hidden="true">·</span> {item.platform}</small></button>)}
+              {games.map((item) => (
+                <button
+                  disabled={!youtubeVerified}
+                  type="button"
+                  key={item.id}
+                  className={item.title === game ? "game-option is-selected" : "game-option"}
+                  style={{ ["--accent" as string]: getAccent(item) }}
+                  aria-pressed={item.title === game}
+                  onClick={() => {
+                    setGame(item.title);
+                    if (item.id !== "generals-zero-hour") setFaction("random");
+                  }}
+                >
+                  <span className="game-option__icon-wrap">
+                    {item.iconUrl || item.imageUrl ? (
+                      <img src={item.iconUrl || item.imageUrl} alt={item.title} className="game-option__icon" />
+                    ) : (
+                      <span className="game-option__glyph">{item.title.slice(0, 2).toUpperCase()}</span>
+                    )}
+                  </span>
+                  <span className="game-option__text">
+                    <span>{item.title}</span>
+                    <small>{item.category} <span aria-hidden="true">·</span> {item.platform}</small>
+                  </span>
+                </button>
+              ))}
             </div>
           </fieldset>
           <fieldset className="registration-field flex flex-col gap-2">

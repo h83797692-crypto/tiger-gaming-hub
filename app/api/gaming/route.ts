@@ -39,6 +39,8 @@ const gamingSchema = z.object({
         category: z.string().max(80),
         platform: z.string().max(80),
         imageUrl: z.string().max(1000),
+        iconUrl: z.string().max(1000).default(""),
+        accentColor: z.string().max(20).optional(),
         rules: z.string().max(500),
         rarity: raritySchema,
       })

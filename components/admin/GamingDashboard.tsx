@@ -27,6 +27,8 @@ const blankGame = (): Game => ({
   category: "",
   platform: "",
   imageUrl: "",
+  iconUrl: "",
+  accentColor: "#00f0ff",
   rules: "",
   rarity: "common",
 });
@@ -67,7 +69,7 @@ function replaceAt<T>(list: T[], index: number, patch: (item: T) => T): T[] {
   return list.map((item, i) => (i === index ? patch(item) : item));
 }
 
-export function GamingDashboard({ initial, section = "all" }: { initial: GamingContent; section?: "all" | "tournaments" | "site" }) {
+export function GamingDashboard({ initial, section = "all" }: { initial: GamingContent; section?: "all" | "games" | "tournaments" | "site" }) {
   const [data, setData] = useState<GamingContent>(initial);
   const [saving, setSaving] = useState(false);
 
@@ -160,7 +162,7 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
       </>}
 
       {/* ------------------------------------------------------------- GAMES */}
-      {(section === "all" || section === "site") && <>
+      {(section === "all" || section === "games" || section === "site") && <>
       <Card>
         <CardHeader>
           <CardTitle>الألعاب والصور</CardTitle>
@@ -168,7 +170,34 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
 
         <div className="admin-stack">
           {data.games.map((game, index) => (
-            <div className="admin-row" key={game.id}>
+            <div
+              className="admin-row admin-game-row"
+              key={game.id}
+              style={{
+                borderColor: game.accentColor || "rgba(0,240,255,0.35)",
+                boxShadow: game.accentColor ? `0 0 24px ${game.accentColor}22` : undefined,
+              }}
+            >
+              <div className="admin-game-preview">
+                <div
+                  className="admin-game-preview__icon"
+                  style={{
+                    borderColor: game.accentColor || "#00f0ff",
+                    background: `radial-gradient(circle at 30% 30%, ${game.accentColor || "#00f0ff"}66, rgba(10,13,20,0.95) 65%)`,
+                  }}
+                >
+                  {game.iconUrl || game.imageUrl ? (
+                    <img src={game.iconUrl || game.imageUrl} alt={game.title || "Game Icon"} />
+                  ) : (
+                    <span>{(game.title || "G").slice(0, 2).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="admin-game-preview__meta">
+                  <strong>{game.title || "Game title"}</strong>
+                  <span>{game.category || "Category"}</span>
+                </div>
+              </div>
+
               <div className="admin-field">
                 <Label>اسم اللعبة</Label>
                 <Input
@@ -229,11 +258,41 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
                 </select>
               </div>
 
+              <div className="admin-field">
+                <Label>لون اللعبة (اختياري)</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={game.accentColor || "#00f0ff"}
+                    onChange={(e) =>
+                      update("games", replaceAt(data.games, index, (g) => ({ ...g, accentColor: e.target.value })))
+                    }
+                    className="h-10 w-12 rounded border border-white/10 bg-transparent p-0"
+                    aria-label="اختر لون اللعبة"
+                  />
+                  <Input
+                    value={game.accentColor || "#00f0ff"}
+                    onChange={(e) =>
+                      update("games", replaceAt(data.games, index, (g) => ({ ...g, accentColor: e.target.value })))
+                    }
+                    placeholder="#00f0ff"
+                  />
+                </div>
+              </div>
+
               <ImageField
-                label="صورة اللعبة"
+                label="صورة اللعبة (غلاف)"
                 value={game.imageUrl}
                 onChange={(url) =>
                   update("games", replaceAt(data.games, index, (g) => ({ ...g, imageUrl: url })))
+                }
+              />
+
+              <ImageField
+                label="أيقونة اللعبة"
+                value={game.iconUrl || game.imageUrl}
+                onChange={(url) =>
+                  update("games", replaceAt(data.games, index, (g) => ({ ...g, iconUrl: url })))
                 }
               />
 
@@ -256,10 +315,6 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
         </div>
       </Card>
 
-      </>}
-
-      {/* ------------------------------------------------ TOURNAMENTS/ROUNDS */}
-      {(section === "all" || section === "tournaments") && <>
       <Card>
         <CardHeader>
           <CardTitle>البطولات والمواجهات</CardTitle>

@@ -20,6 +20,7 @@ export function ContentCard({
   description,
   footer,
   showRarityBadge = true,
+  accentColor,
 }: {
   rarity?: Rarity;
   media: ReactNode;
@@ -28,9 +29,13 @@ export function ContentCard({
   description?: string;
   footer?: ReactNode;
   showRarityBadge?: boolean;
+  accentColor?: string;
 }) {
   return (
-    <article className={`content-card content-card--${rarity}`}>
+    <article
+      className={`content-card content-card--${rarity}`}
+      style={{ ["--accent" as string]: accentColor ?? undefined }}
+    >
       <div className="content-card__media">
         {media}
         {showRarityBadge && <span className="content-card__rarity">{RARITY_LABEL[rarity]}</span>}

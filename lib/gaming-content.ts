@@ -10,6 +10,8 @@ export interface Game {
   category: string;
   platform: string;
   imageUrl: string;
+  iconUrl: string;
+  accentColor?: string;
   rules: string;
   rarity: Rarity;
 }
@@ -86,6 +88,9 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       platform: "PC",
       imageUrl:
         "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=900&q=80",
+      iconUrl:
+        "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=300&q=80",
+      accentColor: "#00f0ff",
       rules: "5v5 competitive",
       rarity: "legendary",
     },
@@ -96,6 +101,9 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       platform: "Mobile",
       imageUrl:
         "https://images.unsplash.com/photo-1560253023-3ec5d502959f?auto=format&fit=crop&w=900&q=80",
+      iconUrl:
+        "https://images.unsplash.com/photo-1560253023-3ec5d502959f?auto=format&fit=crop&w=300&q=80",
+      accentColor: "#ff4d9d",
       rules: "Squad survival",
       rarity: "rare",
     },
@@ -106,6 +114,9 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       platform: "PC",
       imageUrl:
         "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=900&q=80",
+      iconUrl:
+        "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=300&q=80",
+      accentColor: "#7c5cff",
       rules: "Competitive army tactics",
       rarity: "legendary",
     },
@@ -116,6 +127,9 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       platform: "Console / PC",
       imageUrl:
         "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=900&q=80",
+      iconUrl:
+        "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=300&q=80",
+      accentColor: "#ffb800",
       rules: "3v3 arena",
       rarity: "common",
     },
@@ -213,6 +227,9 @@ function normaliseContent(content: GamingContent): GamingContent {
     ...content,
     games: (content.games ?? []).map((game) => ({
       ...game,
+      imageUrl: game.imageUrl ?? "",
+      iconUrl: game.iconUrl ?? game.imageUrl ?? "",
+      accentColor: game.accentColor || "",
       rarity: coerceRarity(game.rarity),
     })),
     tournaments: (content.tournaments ?? []).map((tournament) => ({

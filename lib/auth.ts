@@ -25,8 +25,8 @@ export const authOptions: NextAuthOptions = {
         }
 
         const email = credentials.email.toLowerCase().trim();
-        const configuredEmail = (process.env.SEED_ADMIN_EMAIL || "admin@example.com").toLowerCase().trim();
-        const environmentPassword = process.env.ADMIN_PASSWORD;
+        const configuredEmail = (process.env.SEED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "admin@example.com").toLowerCase().trim();
+        const environmentPassword = process.env.ADMIN_PASSWORD || process.env.SEED_ADMIN_PASSWORD;
 
         // Keep the existing MongoDB bcrypt path, with a constant-time
         // environment fallback for deployments without a seeded admin.

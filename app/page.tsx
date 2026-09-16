@@ -39,6 +39,7 @@ export default async function HomePage() {
             <ContentCard
               key={game.id}
               rarity={game.rarity}
+              accentColor={game.accentColor || undefined}
               media={<CardImage src={game.imageUrl} alt={game.title} />}
               meta={`${game.category} · ${game.platform}`}
               title={game.title}

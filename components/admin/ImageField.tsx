@@ -24,8 +24,7 @@ export function ImageField({
   accept?: string;
   preview?: boolean;
 }) {
-  // Default to whichever tab matches the value already stored.
-  const [mode, setMode] = useState<Mode>(value && !value.startsWith("/uploads/") ? "url" : "upload");
+  const [mode, setMode] = useState<Mode>(value ? (value.startsWith("/uploads/") || value.startsWith("blob:") ? "upload" : "url") : "upload");
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -78,17 +77,20 @@ export function ImageField({
       </div>
 
       {mode === "upload" ? (
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          disabled={uploading}
-          className="w-full text-xs text-white/60 file:me-3 file:border-0 file:bg-tiger-cyan file:px-3 file:py-2 file:text-xs file:font-bold file:text-tiger-void"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) handleFile(file);
-          }}
-        />
+        <div className="space-y-2">
+          <input
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            disabled={uploading}
+            className="w-full rounded-lg border border-dashed border-white/15 bg-[#0d121a] px-3 py-2 text-xs text-white/70 file:me-3 file:border-0 file:rounded-md file:bg-gradient-to-r file:from-[#00F0FF] file:to-[#00A3FF] file:px-3 file:py-2 file:text-xs file:font-bold file:text-[#07090E]"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) handleFile(file);
+            }}
+          />
+          {uploading && <span className="admin-subtle">جارٍ رفع الملف إلى السلة المحلية…</span>}
+        </div>
       ) : (
         <input
           type="url"

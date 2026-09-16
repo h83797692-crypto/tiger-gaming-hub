@@ -10,9 +10,10 @@ import { LeaderboardForm } from "@/components/admin/LeaderboardForm";
 import { RosterViewer } from "@/components/admin/RosterViewer";
 import { SocialSettingsForm } from "@/components/admin/SocialSettingsForm";
 
-type Tab = "tournaments" | "social" | "roster" | "site";
+type Tab = "games" | "tournaments" | "social" | "roster" | "site";
 
 const TABS: { id: Tab; label: string; icon: typeof Trophy }[] = [
+  { id: "games", label: "الألعاب", icon: ImageIcon },
   { id: "tournaments", label: "البطولات", icon: Trophy },
   { id: "social", label: "روابط التواصل الاجتماعي", icon: Link2 },
   { id: "roster", label: "اللاعبين والنتائج", icon: Users },
@@ -20,7 +21,7 @@ const TABS: { id: Tab; label: string; icon: typeof Trophy }[] = [
 ];
 
 export function AdminDashboardTabs({ content, leaderboard, socialSettings }: { content: GamingContent; leaderboard: Leaderboard; socialSettings: SocialSettings }) {
-  const [active, setActive] = useState<Tab>("tournaments");
+  const [active, setActive] = useState<Tab>("games");
 
   return (
     <div className="admin-tabs-shell" dir="rtl">
@@ -33,6 +34,7 @@ export function AdminDashboardTabs({ content, leaderboard, socialSettings }: { c
         ))}
       </nav>
       <main className="admin-tab-panel" role="tabpanel">
+        {active === "games" && <GamingDashboard initial={content} section="games" />}
         {active === "tournaments" && <GamingDashboard initial={content} section="tournaments" />}
         {active === "social" && <SocialSettingsForm initial={socialSettings} />}
         {active === "roster" && <div className="admin-stack"><LeaderboardForm initial={leaderboard} /><RosterViewer tournaments={content.tournaments} /></div>}

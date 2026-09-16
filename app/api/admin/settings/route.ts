@@ -4,14 +4,19 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getSocialSettings, updateSocialSettings } from "@/lib/settings";
 
+const optionalText = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim() : value ?? ""),
+  z.string().max(1000).default("")
+);
+
 const settingsSchema = z.object({
-  tiktokUrl: z.string().url().max(300).or(z.literal("")),
-  discordUrl: z.string().url().max(300).or(z.literal("")),
-  instagramUrl: z.string().url().max(300).or(z.literal("")),
-  youtubeUrl: z.string().url().max(300).or(z.literal("")),
-  paypalEmailOrLink: z.union([z.string().url().max(300), z.string().email().max(160), z.literal("")]),
-  ibanOrBankInfo: z.string().max(1000),
-  customDonationMessage: z.string().max(500),
+  tiktokUrl: optionalText,
+  discordUrl: optionalText,
+  instagramUrl: optionalText,
+  youtubeUrl: optionalText,
+  paypalEmailOrLink: optionalText,
+  ibanOrBankInfo: optionalText,
+  customDonationMessage: optionalText,
 });
 
 export async function GET() {

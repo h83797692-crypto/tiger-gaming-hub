@@ -38,10 +38,17 @@ export function SocialSettingsForm({ initial }: { initial: SocialSettings }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "تعذر الحفظ");
-      setSettings(payload);
-      toast.success("تم حفظ إعدادات التواصل الاجتماعي");
+
+      const payload = response.headers.get("content-type")?.includes("application/json")
+        ? await response.json().catch(() => ({}))
+        : {};
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "تعذر الحفظ");
+      }
+
+      setSettings(payload ?? settings);
+      toast.success("تم حفظ التغييرات بنجاح ✅");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر الحفظ");
     } finally {

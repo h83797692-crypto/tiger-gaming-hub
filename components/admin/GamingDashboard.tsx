@@ -109,11 +109,16 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+
+      const payload = res.headers.get("content-type")?.includes("application/json")
+        ? await res.json().catch(() => ({}))
+        : {};
+
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
         throw new Error(payload.error ?? "تعذر الحفظ");
       }
-      toast.success("تم حفظ إعدادات Tiger Gaming");
+
+      toast.success("تم حفظ إعدادات Tiger Gaming بنجاح ✅");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر الحفظ");
     } finally {

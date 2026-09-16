@@ -7,7 +7,10 @@ import { getGamingContent, updateGamingContent } from "@/lib/gaming-content";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const methodHeaders = { Allow: "GET, PUT, OPTIONS" };
+const methodHeaders = {
+  Allow: "GET, PUT, OPTIONS",
+  "Cache-Control": "no-store, max-age=0",
+};
 
 const raritySchema = z.enum(["common", "rare", "legendary"]).default("common");
 

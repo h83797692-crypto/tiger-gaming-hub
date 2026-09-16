@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/mongodb";
 import { getYoutubeId } from "@/lib/youtube";
+import { unstable_noStore as noStore } from "next/cache";
 
 /** Rarity drives the ContentCard glow border. */
 export type Rarity = "common" | "rare" | "legendary";
@@ -262,6 +263,8 @@ function normaliseContent(content: GamingContent): GamingContent {
 }
 
 export async function getGamingContent(): Promise<GamingContent> {
+  noStore();
+
   try {
     const db = await getDb();
     const doc = await db.collection("gaming").findOne({ _id: DOC_ID as any });

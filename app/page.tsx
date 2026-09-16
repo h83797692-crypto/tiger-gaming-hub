@@ -11,6 +11,7 @@ import { HeroSection } from "@/components/gaming/HeroSection";
 // Always read fresh content - an admin edit should be visible on the next page
 // load, not stuck behind a stale cache.
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const STATUS_LABEL: Record<string, string> = {
   open: "التسجيل مفتوح",

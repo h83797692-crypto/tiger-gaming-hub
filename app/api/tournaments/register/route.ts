@@ -8,7 +8,7 @@ const registrationSchema = z.object({
   tournamentId: z.string().min(1).max(120),
   playerName: z.string().trim().min(2).max(80),
   inGameId: z.string().trim().min(1).max(80),
-  mode: z.enum(["solo", "duo", "trio", "squad", "ffa"]),
+  mode: z.enum(["solo", "duo", "trio", "squad", "ffa", "partnership", "single-table", "tarneeb", "baloot"]),
   faction: z.enum(["usa", "china", "gla", "random"]).optional(),
   gameId: z.string().min(1).max(120),
   game: z.string().trim().min(1).max(120),
@@ -35,8 +35,16 @@ export async function POST(request: NextRequest) {
     if (isGenerals && !parsed.data.faction) {
       return NextResponse.json({ error: "اختر فصيل Generals قبل التسجيل." }, { status: 400 });
     }
-    if (!isGenerals && (parsed.data.mode === "trio" || parsed.data.mode === "ffa" || parsed.data.faction)) {
+    const isJawaker = parsed.data.gameId === "jawaker";
+    const jawakerModes = new Set(["partnership", "single-table", "tarneeb", "baloot"]);
+    if (isJawaker && !jawakerModes.has(parsed.data.mode)) {
+      return NextResponse.json({ error: "اختر نمط لعب Jawaker الصحيح." }, { status: 400 });
+    }
+    if (!isGenerals && !isJawaker && (parsed.data.mode === "trio" || parsed.data.mode === "ffa" || parsed.data.faction)) {
       return NextResponse.json({ error: "خيارات Generals متاحة لهذه اللعبة فقط." }, { status: 400 });
+    }
+    if (isGenerals && jawakerModes.has(parsed.data.mode)) {
+      return NextResponse.json({ error: "اختر نمط لعب Generals الصحيح." }, { status: 400 });
     }
     const maxPlayers = Math.max(1, Number(configuredTournament?.maxPlayers ?? 8));
     const registrationCount = await db.collection("tournament-registrations").countDocuments({

@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import type { Game, Tournament } from "@/lib/gaming-content";
 
-type Mode = "solo" | "duo" | "trio" | "squad" | "ffa";
+type Mode = "solo" | "duo" | "trio" | "squad" | "ffa" | "partnership" | "single-table" | "tarneeb" | "baloot";
 type Faction = "usa" | "china" | "gla" | "random";
 
 const CATEGORY_ACCENTS: Record<string, string> = {
@@ -28,6 +28,13 @@ const GENERALS_MODES: { value: Mode; label: string; detail: string }[] = [
   { value: "trio", label: "Trio 3v3", detail: "فريق ثلاثي" },
   { value: "squad", label: "Squad 4v4", detail: "فريق رباعي" },
   { value: "ffa", label: "8-Player FFA", detail: "قتال حر" },
+];
+
+const JAWAKER_MODES: { value: Mode; label: string; detail: string }[] = [
+  { value: "partnership", label: "شراكة", detail: "فريقان من لاعبين" },
+  { value: "single-table", label: "طاولة فردية", detail: "لعب فردي" },
+  { value: "tarneeb", label: "طرنيب", detail: "نظام طرنيب" },
+  { value: "baloot", label: "بلّوت", detail: "نظام بلّوت" },
 ];
 
 const GENERALS_FACTIONS: { value: Faction; label: string; detail: string }[] = [
@@ -75,8 +82,13 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
   const isFull = reserved >= maxPlayers;
   const selectedGame = games.find((item) => item.title === game);
   const isGenerals = selectedGame?.id === "generals-zero-hour";
-  const availableModes = isGenerals ? GENERALS_MODES : MODES;
+  const isJawaker = selectedGame?.id === "jawaker";
+  const availableModes = isJawaker ? JAWAKER_MODES : isGenerals ? GENERALS_MODES : MODES;
   const getAccent = (item: Game) => item.accentColor || CATEGORY_ACCENTS[item.category] || CATEGORY_ACCENTS.default;
+
+  useEffect(() => {
+    setMode(isJawaker ? "partnership" : "solo");
+  }, [isGenerals, isJawaker]);
 
   async function verifySubscription() {
     setCheckingSubscription(true);
@@ -169,6 +181,7 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
                   aria-pressed={item.title === game}
                   onClick={() => {
                     setGame(item.title);
+                    setMode(item.id === "jawaker" ? "partnership" : "solo");
                     if (item.id !== "generals-zero-hour") setFaction("random");
                   }}
                 >

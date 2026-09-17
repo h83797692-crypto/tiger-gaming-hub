@@ -16,6 +16,10 @@ function getGameAccent(game: Game): string {
   return game.accentColor || CATEGORY_ACCENTS[game.category] || CATEGORY_ACCENTS.default;
 }
 
+function scrollToRegistration() {
+  document.getElementById("tournaments")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 export function HeroSection({ title, subtitle, cta, announcement, games }: { title: string; subtitle: string; cta: string; announcement: string; games: Game[] }) {
   const [activeGame, setActiveGame] = useState(games[0]);
 
@@ -41,7 +45,10 @@ export function HeroSection({ title, subtitle, cta, announcement, games }: { tit
               style={{ ["--accent" as string]: accent }}
               onMouseEnter={() => setActiveGame(game)}
               onFocus={() => setActiveGame(game)}
-              onClick={() => setActiveGame(game)}
+              onClick={() => {
+                setActiveGame(game);
+                scrollToRegistration();
+              }}
               whileHover={{ y: -4, scale: 1.02 }}
             >
               <span className="hero-game-tab__icon">

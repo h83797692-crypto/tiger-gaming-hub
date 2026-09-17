@@ -1264,6 +1264,41 @@ body {
 .admin-roster__table th { color: var(--cyan); font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase; }
 
 @media (max-width: 560px) {
+  .hero-game-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+    inline-size: 100%;
+    padding-inline: 0.9rem;
+  }
+  .hero-game-tab {
+    min-inline-size: 0;
+    inline-size: 100%;
+    min-block-size: 4.25rem;
+    padding: 0.75rem 0.9rem;
+  }
+  .hero-game-tab__icon {
+    flex: 0 0 2.8rem;
+    inline-size: 2.8rem;
+    block-size: 2.8rem;
+  }
+  .hero-game-tab__text {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+  .game-selector, .mode-selector {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+  .game-option, .mode-option {
+    inline-size: 100%;
+    min-block-size: 4.25rem;
+  }
+  .game-option__text, .mode-option b, .mode-option small {
+    min-inline-size: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .header-shell {
     flex-direction: column;
     align-items: stretch;

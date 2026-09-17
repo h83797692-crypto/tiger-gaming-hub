@@ -32,7 +32,10 @@ export interface Match {
   scoreB: number;
   status: "upcoming" | "live" | "done";
   startTime: string;
+  liveUrl?: string;
   winner?: string;
+  resultA?: "winner" | "loser";
+  resultB?: "winner" | "loser";
 }
 
 export interface Round {
@@ -178,22 +181,31 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       rules: "Single elimination · Best of 3",
       rounds: [
         {
-          name: "ربع النهائي",
+          name: "الدور الأول",
           matches: [
-            { playerA: "Falcon Squad", playerB: "Night Raid", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-10-04T18:00:00" },
-            { playerA: "Zero Ping", playerB: "Cyber Lions", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-10-04T20:00:00" },
+            { playerA: "AlphaViper", playerB: "BlazeCore", scoreA: 2, scoreB: 1, status: "done", startTime: "2026-10-04T18:00:00" },
+            { playerA: "CyberNova", playerB: "DeltaFox", scoreA: 2, scoreB: 0, status: "done", startTime: "2026-10-04T18:25:00" },
+            { playerA: "EchoRune", playerB: "FrostByte", scoreA: 0, scoreB: 2, status: "done", startTime: "2026-10-04T18:50:00" },
+            { playerA: "GhostPulse", playerB: "IonStorm", scoreA: 2, scoreB: 1, status: "done", startTime: "2026-10-04T19:15:00" },
+            { playerA: "JadeTitan", playerB: "KnightShift", scoreA: 2, scoreB: 0, status: "done", startTime: "2026-10-04T19:40:00" },
+            { playerA: "LunaDrift", playerB: "MeteorBite", scoreA: 1, scoreB: 2, status: "done", startTime: "2026-10-04T20:05:00" },
+            { playerA: "NightRanger", playerB: "ObsidianX", scoreA: 2, scoreB: 1, status: "done", startTime: "2026-10-04T20:30:00" },
+            { playerA: "PhoenixApex", playerB: "QuartzZero", scoreA: 2, scoreB: 0, status: "done", startTime: "2026-10-04T20:55:00" },
           ],
         },
         {
           name: "نصف النهائي",
           matches: [
-            { playerA: "الفائز 1", playerB: "الفائز 2", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-10-05T18:00:00" },
+            { playerA: "AlphaViper", playerB: "CyberNova", scoreA: 2, scoreB: 1, status: "done", startTime: "2026-10-05T18:00:00" },
+            { playerA: "FrostByte", playerB: "GhostPulse", scoreA: 1, scoreB: 2, status: "done", startTime: "2026-10-05T18:20:00" },
+            { playerA: "JadeTitan", playerB: "MeteorBite", scoreA: 2, scoreB: 0, status: "done", startTime: "2026-10-05T18:40:00" },
+            { playerA: "NightRanger", playerB: "PhoenixApex", scoreA: 1, scoreB: 2, status: "done", startTime: "2026-10-05T19:00:00" },
           ],
         },
         {
           name: "النهائي",
           matches: [
-            { playerA: "TBD", playerB: "TBD", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-10-05T20:00:00" },
+            { playerA: "AlphaViper", playerB: "GhostPulse", scoreA: 3, scoreB: 2, status: "done", startTime: "2026-10-05T20:00:00" },
           ],
         },
       ],
@@ -210,10 +222,24 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       rules: "Points leaderboard",
       rounds: [
         {
-          name: "الجولة الحية",
+          name: "الدور الأول",
           matches: [
             { playerA: "Squad Alpha", playerB: "Squad Delta", scoreA: 8, scoreB: 6, status: "live", startTime: "2026-09-28T20:00:00" },
             { playerA: "Tiger Force", playerB: "Nova 7", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-09-28T21:00:00" },
+            { playerA: "Storm Hunt", playerB: "Red Horizon", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-09-28T21:30:00" },
+            { playerA: "Wolf Pack", playerB: "Apex Kings", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-09-28T22:00:00" },
+          ],
+        },
+        {
+          name: "نصف النهائي",
+          matches: [
+            { playerA: "الفائز 1", playerB: "الفائز 2", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-09-29T19:00:00" },
+          ],
+        },
+        {
+          name: "النهائي",
+          matches: [
+            { playerA: "TBD", playerB: "TBD", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "2026-09-29T21:00:00" },
           ],
         },
       ],
@@ -296,6 +322,100 @@ function normaliseContent(content: GamingContent): GamingContent {
       };
     }),
   };
+}
+
+export function buildSingleEliminationBracket(
+  players: Array<string | undefined | null>,
+  roundNames: string[] = ["الدور الأول", "نصف النهائي", "النهائي"]
+): Round[] {
+  const cleaned = players.map((player) => (player ?? "").trim()).filter(Boolean);
+
+  if (cleaned.length === 0) {
+    return [{
+      name: roundNames[0] ?? "الدور الأول",
+      matches: [{ playerA: "TBD", playerB: "TBD", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "" }],
+    }];
+  }
+
+  const rounds: Round[] = [];
+  let current = [...cleaned];
+  let roundIndex = 0;
+
+  while (current.length > 1) {
+    const padded = [...current];
+    while (padded.length % 2 !== 0) {
+      padded.push("BYE");
+    }
+
+    const matches: Match[] = [];
+    for (let index = 0; index < padded.length; index += 2) {
+      matches.push({
+        playerA: padded[index] ?? "TBD",
+        playerB: padded[index + 1] ?? "TBD",
+        scoreA: 0,
+        scoreB: 0,
+        status: "upcoming",
+        startTime: "",
+      });
+    }
+
+    rounds.push({
+      name: roundNames[roundIndex] ?? `الجولة ${roundIndex + 1}`,
+      matches,
+    });
+
+    current = Array.from({ length: matches.length }, (_, matchIndex) => `الفائز ${matchIndex + 1}`);
+    roundIndex += 1;
+  }
+
+  if (rounds.length === 0) {
+    return [{
+      name: roundNames[0] ?? "الدور الأول",
+      matches: [{ playerA: cleaned[0], playerB: "TBD", scoreA: 0, scoreB: 0, status: "upcoming", startTime: "" }],
+    }];
+  }
+
+  return rounds;
+}
+
+export function advanceBracketWinner(rounds: Round[], roundIndex: number, matchIndex: number, winner: string): Round[] {
+  const next = rounds.map((round) => ({
+    ...round,
+    matches: round.matches.map((match) => ({ ...match })),
+  }));
+
+  const currentMatch = next[roundIndex]?.matches[matchIndex];
+  if (!currentMatch || !winner) return next;
+
+  currentMatch.winner = winner;
+  currentMatch.status = "done";
+  currentMatch.scoreA = currentMatch.playerA === winner ? 1 : 0;
+  currentMatch.scoreB = currentMatch.playerB === winner ? 1 : 0;
+
+  const nextRound = next[roundIndex + 1];
+  if (!nextRound) return next;
+
+  const nextMatchIndex = Math.floor(matchIndex / 2);
+  const nextMatch = nextRound.matches[nextMatchIndex];
+  if (!nextMatch) return next;
+
+  const placeholderA = !nextMatch.playerA || nextMatch.playerA === "TBD" || nextMatch.playerA === "BYE" || /^الفائز\s+\d+$/.test(nextMatch.playerA);
+  const placeholderB = !nextMatch.playerB || nextMatch.playerB === "TBD" || nextMatch.playerB === "BYE" || /^الفائز\s+\d+$/.test(nextMatch.playerB);
+
+  if (matchIndex % 2 === 0) {
+    if (placeholderA) nextMatch.playerA = winner;
+    else if (placeholderB) nextMatch.playerB = winner;
+  } else if (placeholderB) {
+    nextMatch.playerB = winner;
+  } else if (placeholderA) {
+    nextMatch.playerA = winner;
+  }
+
+  if (nextMatch.playerA && nextMatch.playerB && nextMatch.playerA !== "TBD" && nextMatch.playerB !== "TBD" && nextMatch.playerA !== "BYE" && nextMatch.playerB !== "BYE") {
+    nextMatch.status = "upcoming";
+  }
+
+  return next;
 }
 
 export async function getGamingContent(): Promise<GamingContent> {

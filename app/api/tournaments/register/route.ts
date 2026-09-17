@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
+import { buildSingleEliminationBracket } from "@/lib/tournament-bracket";
+
+export const dynamic = "force-dynamic";
 
 const registrationSchema = z.object({
   tournamentId: z.string().min(1).max(120),
@@ -59,6 +62,30 @@ export async function POST(request: NextRequest) {
       slot,
       createdAt: new Date(),
     });
+
+    if (slot === maxPlayers && configuredTournament) {
+      const completedRegistrations = await db
+        .collection("tournament-registrations")
+        .find({ tournamentId: parsed.data.tournamentId })
+        .sort({ createdAt: 1 })
+        .limit(maxPlayers)
+        .toArray();
+      const rounds = buildSingleEliminationBracket(
+        completedRegistrations.map((registration) => registration.playerName || registration.inGameId),
+        ["الدور الأول", "نصف النهائي", "النهائي"],
+        maxPlayers
+      );
+
+      await db.collection("tournament-brackets").updateOne(
+        { tournamentId: parsed.data.tournamentId },
+        { $set: { tournamentId: parsed.data.tournamentId, rounds, maxPlayers, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      await db.collection("gaming").updateOne(
+        { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
+        { $set: { "tournaments.$.rounds": rounds, updatedAt: new Date() } }
+      );
+    }
 
     return NextResponse.json({
       success: true,

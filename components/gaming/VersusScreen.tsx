@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Game, Match, Tournament } from "@/lib/gaming-content";
+import type { Game, Match, Round, Tournament } from "@/lib/gaming-content";
 import { RegistrationModal } from "@/components/gaming/RegistrationModal";
+import { TournamentBracket } from "@/components/gaming/TournamentBracket";
+import { buildSingleEliminationBracket } from "@/lib/tournament-bracket";
 
 const ROUND_FALLBACKS = ["Round 1", "Quarters", "Semis", "Final"];
 
@@ -118,62 +120,51 @@ function MatchCard({ match }: { match: Match }) {
  * round's matches render as broadcast-style head-to-head cards.
  */
 export function VersusScreen({ tournament, games }: { tournament: Tournament; games: Game[] }) {
-  const rounds = useMemo(() => tournament.rounds ?? [], [tournament.rounds]);
-
-  // Open on the round that actually has a live match, else the first round.
-  const initialRound = useMemo(() => {
-    const liveIndex = rounds.findIndex((round) =>
-      round.matches?.some((match) => match.status === "live")
-    );
-    return liveIndex >= 0 ? liveIndex : 0;
-  }, [rounds]);
-
-  const [activeRound, setActiveRound] = useState(initialRound);
+  const [liveRounds, setLiveRounds] = useState<Round[]>(tournament.rounds ?? []);
+  const [registeredCount, setRegisteredCount] = useState(0);
   const [isRegistrationOpen, setRegistrationOpen] = useState(false);
 
   useEffect(() => {
-    setActiveRound(initialRound);
-  }, [initialRound]);
+    let active = true;
+    const loadBracket = async () => {
+      const response = await fetch(`/api/tournaments/bracket?tournamentId=${encodeURIComponent(tournament.id)}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (!active) return;
+      const registrations = Array.isArray(payload.registrations) ? payload.registrations : [];
+      setRegisteredCount(registrations.length);
+      if (Array.isArray(payload.rounds) && payload.rounds.length > 0) {
+        setLiveRounds(payload.rounds);
+      } else if (registrations.length > 0) {
+        setLiveRounds(buildSingleEliminationBracket(
+          registrations.map((registration: { playerName?: string; inGameId?: string }) => registration.playerName || registration.inGameId),
+          ["الدور الأول", "نصف النهائي", "النهائي"],
+          tournament.maxPlayers
+        ));
+      } else {
+        setLiveRounds(tournament.rounds ?? []);
+      }
+    };
+    loadBracket().catch(() => undefined);
+    const interval = window.setInterval(() => loadBracket().catch(() => undefined), 3000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [tournament.id, tournament.maxPlayers, tournament.rounds]);
 
-  const activeMatches = rounds[activeRound]?.matches ?? [];
-
-  if (rounds.length === 0) {
-    return <div className="versus-empty">لم تُضف جولات لهذه البطولة بعد.</div>;
-  }
+  const displayRounds = liveRounds;
 
   return (
     <div className="versus-screen">
       <button type="button" className="tournament-join-button" onClick={() => setRegistrationOpen(true)}>
         انضمام للبطولة <span aria-hidden="true">↗</span>
       </button>
-      <div className="round-tabs" role="tablist" aria-label="جولات البطولة">
-        {rounds.map((round, index) => {
-          const hasLive = round.matches?.some((match) => match.status === "live");
-          return (
-            <button
-              type="button"
-              key={`${round.name}-${index}`}
-              role="tab"
-              aria-selected={index === activeRound}
-              className={index === activeRound ? "round-tab is-active" : "round-tab"}
-              onClick={() => setActiveRound(index)}
-            >
-              {hasLive && <i className="live-dot" aria-hidden="true" />}
-              {round.name || ROUND_FALLBACKS[index] || `Round ${index + 1}`}
-            </button>
-          );
-        })}
-      </div>
 
-      <div className="versus-feed" role="tabpanel">
-        {activeMatches.length > 0 ? (
-          activeMatches.map((match, index) => (
-            <MatchCard key={`${match.playerA}-${match.playerB}-${index}`} match={match} />
-          ))
-        ) : (
-          <div className="versus-empty">لا توجد مواجهات في هذه الجولة.</div>
-        )}
-      </div>
+      <p className="mt-2 text-xs text-white/55">المسجلون: {registeredCount}/{tournament.maxPlayers}</p>
+
+      <TournamentBracket rounds={displayRounds} />
+
       {isRegistrationOpen && (
         <RegistrationModal tournament={tournament} games={games} onClose={() => setRegistrationOpen(false)} />
       )}

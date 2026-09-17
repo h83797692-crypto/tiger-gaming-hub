@@ -448,7 +448,8 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
 
                 <div className="admin-field">
                   <Label>اللعبة</Label>
-                  <Input
+                  <select
+                    className="admin-select"
                     value={tournament.game}
                     onChange={(e) =>
                       update(
@@ -456,7 +457,10 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
                         replaceAt(data.tournaments, tIndex, (t) => ({ ...t, game: e.target.value }))
                       )
                     }
-                  />
+                  >
+                    {data.games.map((game) => <option key={game.id} value={game.title}>{game.title}</option>)}
+                    {!data.games.some((game) => game.title === tournament.game) && <option value={tournament.game}>{tournament.game}</option>}
+                  </select>
                 </div>
 
                 <div className="admin-field">
@@ -530,9 +534,8 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
 
                 <div className="admin-field">
                   <Label>الحد الأقصى للاعبين</Label>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
+                  <select
+                    className="admin-select"
                     value={tournament.maxPlayers}
                     onChange={(e) =>
                       update(
@@ -543,7 +546,10 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
                         }))
                       )
                     }
-                  />
+                  >
+                    {[16, 32, 50, 100].map((size) => <option key={size} value={size}>{size} لاعب</option>)}
+                    {!([16, 32, 50, 100] as number[]).includes(tournament.maxPlayers) && <option value={tournament.maxPlayers}>{tournament.maxPlayers} لاعب</option>}
+                  </select>
                 </div>
 
                 <div className="admin-field">

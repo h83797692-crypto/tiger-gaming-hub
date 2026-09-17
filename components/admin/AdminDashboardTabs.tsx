@@ -16,7 +16,7 @@ const TABS: { id: Tab; label: string; icon: typeof Trophy }[] = [
   { id: "games", label: "الألعاب", icon: ImageIcon },
   { id: "tournaments", label: "البطولات", icon: Trophy },
   { id: "social", label: "روابط التواصل الاجتماعي", icon: Link2 },
-  { id: "roster", label: "اللاعبين والنتائج", icon: Users },
+  { id: "roster", label: "الترتيب العام", icon: Users },
   { id: "site", label: "إعدادات الموقع والصور", icon: ImageIcon },
 ];
 
@@ -35,9 +35,14 @@ export function AdminDashboardTabs({ content, leaderboard, socialSettings }: { c
       </nav>
       <main className="admin-tab-panel" role="tabpanel">
         {active === "games" && <GamingDashboard initial={content} section="games" />}
-        {active === "tournaments" && <GamingDashboard initial={content} section="tournaments" />}
+        {active === "tournaments" && (
+          <div className="admin-stack">
+            <GamingDashboard initial={content} section="tournaments" />
+            <RosterViewer tournaments={content.tournaments} games={content.games} />
+          </div>
+        )}
         {active === "social" && <SocialSettingsForm initial={socialSettings} />}
-        {active === "roster" && <div className="admin-stack"><LeaderboardForm initial={leaderboard} /><RosterViewer tournaments={content.tournaments} /></div>}
+        {active === "roster" && <LeaderboardForm initial={leaderboard} />}
         {active === "site" && <GamingDashboard initial={content} section="site" />}
       </main>
     </div>

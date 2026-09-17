@@ -1038,6 +1038,20 @@ body {
   font-family: inherit;
   font-size: 0.875rem;
 }
+.admin-input {
+  min-block-size: 2.75rem;
+  inline-size: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0.5rem;
+  background: var(--panel);
+  color: #fff;
+  caret-color: var(--cyan);
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+  outline: none;
+}
+.admin-input::placeholder { color: rgba(255, 255, 255, 0.45); }
+.admin-input:focus, .admin-textarea:focus, .admin-select:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.12); }
 .admin-actions {
   display: flex;
   flex-wrap: wrap;

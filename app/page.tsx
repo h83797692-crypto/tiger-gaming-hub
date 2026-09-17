@@ -42,9 +42,9 @@ export default async function HomePage() {
               rarity={game.rarity}
               accentColor={game.accentColor || undefined}
               media={<CardImage src={game.imageUrl} alt={game.title} />}
-              meta={`${game.category} · ${game.platform}`}
+              meta={`${game.category} · ${game.platform}${game.gameplayType ? ` · ${game.gameplayType}` : ""}`}
               title={game.title}
-              description={game.rules}
+              description={[game.description, game.rules].filter(Boolean).join(" ")}
             />
           ))}
         </div>

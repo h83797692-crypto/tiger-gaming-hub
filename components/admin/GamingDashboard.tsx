@@ -25,10 +25,12 @@ const blankGame = (): Game => ({
   id: crypto.randomUUID(),
   title: "",
   category: "",
+  gameplayType: "",
   platform: "",
   imageUrl: "",
   iconUrl: "",
   accentColor: "#00f0ff",
+  description: "",
   rules: "",
   rarity: "common",
 });
@@ -72,9 +74,30 @@ function replaceAt<T>(list: T[], index: number, patch: (item: T) => T): T[] {
 export function GamingDashboard({ initial, section = "all" }: { initial: GamingContent; section?: "all" | "games" | "tournaments" | "site" }) {
   const [data, setData] = useState<GamingContent>(initial);
   const [saving, setSaving] = useState(false);
+  const [discovering, setDiscovering] = useState<number | null>(null);
 
   const update = <K extends keyof GamingContent>(key: K, value: GamingContent[K]) =>
     setData((current) => ({ ...current, [key]: value }));
+
+  async function discoverGame(index: number) {
+    const title = data.games[index]?.title.trim();
+    if (!title) {
+      toast.error("اكتب اسم اللعبة أولاً");
+      return;
+    }
+    setDiscovering(index);
+    try {
+      const response = await fetch(`/api/gaming/discover?q=${encodeURIComponent(title)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error ?? "تعذر البحث عن اللعبة");
+      update("games", replaceAt(data.games, index, (game) => ({ ...game, ...payload.result })));
+      toast.success("تم التعرف على اللعبة. راجع البيانات ثم احفظها.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر البحث عن اللعبة");
+    } finally {
+      setDiscovering(null);
+    }
+  }
 
   /** Patch one round inside one tournament without flattening the others. */
   const patchRound = (
@@ -232,6 +255,16 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
               </div>
 
               <div className="admin-field">
+                <Label>نظام اللعب</Label>
+                <Input
+                  value={game.gameplayType}
+                  onChange={(e) =>
+                    update("games", replaceAt(data.games, index, (g) => ({ ...g, gameplayType: e.target.value })))
+                  }
+                />
+              </div>
+
+              <div className="admin-field">
                 <Label>المنصة</Label>
                 <Input
                   value={game.platform}
@@ -247,6 +280,16 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
                   value={game.rules}
                   onChange={(e) =>
                     update("games", replaceAt(data.games, index, (g) => ({ ...g, rules: e.target.value })))
+                  }
+                />
+              </div>
+
+              <div className="admin-field">
+                <Label>وصف اللعبة</Label>
+                <Textarea
+                  value={game.description}
+                  onChange={(e) =>
+                    update("games", replaceAt(data.games, index, (g) => ({ ...g, description: e.target.value })))
                   }
                 />
               </div>
@@ -311,6 +354,9 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
               />
 
               <div className="admin-actions">
+                <Button variant="outline" onClick={() => discoverGame(index)} disabled={discovering === index}>
+                  {discovering === index ? "جارٍ البحث..." : "التعرف التلقائي"}
+                </Button>
                 <Button
                   variant="ghost"
                   onClick={() =>

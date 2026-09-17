@@ -9,10 +9,12 @@ export interface Game {
   id: string;
   title: string;
   category: string;
+  gameplayType: string;
   platform: string;
   imageUrl: string;
   iconUrl: string;
   accentColor?: string;
+  description: string;
   rules: string;
   rarity: Rarity;
 }
@@ -86,12 +88,14 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       id: "cs2",
       title: "Counter-Strike 2",
       category: "FPS",
+      gameplayType: "فِرَق 5 ضد 5",
       platform: "PC",
       imageUrl:
         "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=900&q=80",
       iconUrl:
         "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=300&q=80",
       accentColor: "#00f0ff",
+      description: "لعبة تصويب تنافسية تعتمد على الجولات والتعاون بين أعضاء الفريق.",
       rules: "5v5 competitive",
       rarity: "legendary",
     },
@@ -99,12 +103,14 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       id: "pubg",
       title: "PUBG Mobile",
       category: "Battle Royale",
+      gameplayType: "Squad / Battle Royale",
       platform: "Mobile",
       imageUrl:
         "https://images.unsplash.com/photo-1560253023-3ec5d502959f?auto=format&fit=crop&w=900&q=80",
       iconUrl:
         "https://images.unsplash.com/photo-1560253023-3ec5d502959f?auto=format&fit=crop&w=300&q=80",
       accentColor: "#ff4d9d",
+      description: "يتنافس اللاعبون أو الفرق للبقاء حتى النهاية ضمن خريطة تتقلص تدريجياً.",
       rules: "Squad survival",
       rarity: "rare",
     },
@@ -112,12 +118,14 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       id: "generals-zero-hour",
       title: "Generals: Zero Hour",
       category: "RTS",
+      gameplayType: "استراتيجية لحظية",
       platform: "PC",
       imageUrl:
         "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=900&q=80",
       iconUrl:
         "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=300&q=80",
       accentColor: "#7c5cff",
+      description: "لعبة استراتيجية لحظية تعتمد على بناء القاعدة وإدارة الموارد وقيادة الوحدات.",
       rules: "Competitive army tactics",
       rarity: "legendary",
     },
@@ -125,12 +133,14 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       id: "rocket",
       title: "Rocket League",
       category: "Sports",
+      gameplayType: "مباراة فرق",
       platform: "Console / PC",
       imageUrl:
         "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=900&q=80",
       iconUrl:
         "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=300&q=80",
       accentColor: "#ffb800",
+      description: "مباريات كرة قدم سريعة باستخدام السيارات وتسجيل أكبر عدد من الأهداف.",
       rules: "3v3 arena",
       rarity: "common",
     },
@@ -228,9 +238,11 @@ function normaliseContent(content: GamingContent): GamingContent {
     ...content,
     games: (content.games ?? []).map((game) => ({
       ...game,
+      gameplayType: game.gameplayType ?? "",
       imageUrl: game.imageUrl ?? "",
       iconUrl: game.iconUrl ?? game.imageUrl ?? "",
       accentColor: game.accentColor || "",
+      description: game.description ?? "",
       rarity: coerceRarity(game.rarity),
     })),
     tournaments: (content.tournaments ?? []).map((tournament) => ({

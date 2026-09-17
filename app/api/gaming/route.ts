@@ -40,10 +40,12 @@ const gameSchema = z.object({
   id: z.string().min(1).max(160),
   title: z.string().max(120),
   category: z.string().max(80),
+  gameplayType: z.string().max(120).default(""),
   platform: z.string().max(80),
   imageUrl: optionalGameText,
   iconUrl: optionalGameText,
   accentColor: z.string().max(20).optional().default(""),
+  description: z.string().max(2000).default(""),
   rules: z.string().max(500),
   rarity: raritySchema,
 });

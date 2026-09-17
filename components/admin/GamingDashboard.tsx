@@ -26,6 +26,10 @@ const blankGame = (): Game => ({
   title: "",
   category: "",
   gameplayType: "",
+  matchFormat: "",
+  gameVariant: "",
+  teamMode: "",
+  gameplayGuide: "",
   platform: "",
   imageUrl: "",
   iconUrl: "",
@@ -265,6 +269,39 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
               </div>
 
               <div className="admin-field">
+                <Label>نمط المنافسة</Label>
+                <Input
+                  value={game.matchFormat}
+                  placeholder="مثال: 1v1 أو 2v2 أو 5v5 أو Squad"
+                  onChange={(e) =>
+                    update("games", replaceAt(data.games, index, (g) => ({ ...g, matchFormat: e.target.value })))
+                  }
+                />
+              </div>
+
+              <div className="admin-field">
+                <Label>نوع اللعبة الفرعي</Label>
+                <Input
+                  value={game.gameVariant}
+                  placeholder="مثال: تركس أو طرنيب"
+                  onChange={(e) =>
+                    update("games", replaceAt(data.games, index, (g) => ({ ...g, gameVariant: e.target.value })))
+                  }
+                />
+              </div>
+
+              <div className="admin-field">
+                <Label>طريقة المشاركة</Label>
+                <Input
+                  value={game.teamMode}
+                  placeholder="مثال: فردي أو شراكة 2v2"
+                  onChange={(e) =>
+                    update("games", replaceAt(data.games, index, (g) => ({ ...g, teamMode: e.target.value })))
+                  }
+                />
+              </div>
+
+              <div className="admin-field">
                 <Label>المنصة</Label>
                 <Input
                   value={game.platform}
@@ -290,6 +327,18 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
                   value={game.description}
                   onChange={(e) =>
                     update("games", replaceAt(data.games, index, (g) => ({ ...g, description: e.target.value })))
+                  }
+                />
+              </div>
+
+              <div className="admin-field">
+                <Label>طريقة اللعب بالتفصيل</Label>
+                <Textarea
+                  rows={4}
+                  value={game.gameplayGuide}
+                  placeholder="كيف تبدأ اللعبة؟ ما هدف اللاعب؟ وكيف يتم الفوز؟"
+                  onChange={(e) =>
+                    update("games", replaceAt(data.games, index, (g) => ({ ...g, gameplayGuide: e.target.value })))
                   }
                 />
               </div>

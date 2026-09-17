@@ -42,9 +42,9 @@ export default async function HomePage() {
               rarity={game.rarity}
               accentColor={game.accentColor || undefined}
               media={<CardImage src={game.imageUrl} alt={game.title} />}
-              meta={`${game.category} · ${game.platform}${game.gameplayType ? ` · ${game.gameplayType}` : ""}`}
+              meta={`${game.category} · ${game.platform}${game.gameplayType ? ` · ${game.gameplayType}` : ""}${game.matchFormat ? ` · ${game.matchFormat}` : ""}${game.gameVariant ? ` · ${game.gameVariant}` : ""}${game.teamMode ? ` · ${game.teamMode}` : ""}`}
               title={game.title}
-              description={[game.description, game.rules].filter(Boolean).join(" ")}
+              description={[game.gameplayGuide, game.description, game.rules].filter(Boolean).join(" ")}
             />
           ))}
         </div>

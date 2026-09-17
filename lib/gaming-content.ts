@@ -10,6 +10,10 @@ export interface Game {
   title: string;
   category: string;
   gameplayType: string;
+  matchFormat: string;
+  gameVariant: string;
+  teamMode: string;
+  gameplayGuide: string;
   platform: string;
   imageUrl: string;
   iconUrl: string;
@@ -89,6 +93,10 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       title: "Counter-Strike 2",
       category: "FPS",
       gameplayType: "فِرَق 5 ضد 5",
+      matchFormat: "5v5",
+      gameVariant: "",
+      teamMode: "فرق",
+      gameplayGuide: "اختيار فصيل، جمع الموارد، بناء قاعدة، ثم إنتاج الوحدات ومهاجمة قاعدة الخصم.",
       platform: "PC",
       imageUrl:
         "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=900&q=80",
@@ -104,6 +112,10 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       title: "PUBG Mobile",
       category: "Battle Royale",
       gameplayType: "Squad / Battle Royale",
+      matchFormat: "Squad",
+      gameVariant: "",
+      teamMode: "فرق",
+      gameplayGuide: "ينزل اللاعب أو الفريق إلى الخريطة، يجمع المعدات، ويتحرك داخل المنطقة الآمنة حتى يبقى آخر لاعب أو فريق.",
       platform: "Mobile",
       imageUrl:
         "https://images.unsplash.com/photo-1560253023-3ec5d502959f?auto=format&fit=crop&w=900&q=80",
@@ -119,6 +131,10 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       title: "Generals: Zero Hour",
       category: "RTS",
       gameplayType: "استراتيجية لحظية",
+      matchFormat: "1v1",
+      gameVariant: "",
+      teamMode: "فردي",
+      gameplayGuide: "إدارة الاقتصاد وبناء القاعدة واختيار الوحدات المناسبة لمواجهة استراتيجية الخصم في الوقت الحقيقي.",
       platform: "PC",
       imageUrl:
         "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=900&q=80",
@@ -134,6 +150,10 @@ export const DEFAULT_GAMING_CONTENT: GamingContent = {
       title: "Rocket League",
       category: "Sports",
       gameplayType: "مباراة فرق",
+      matchFormat: "3v3",
+      gameVariant: "",
+      teamMode: "فرق",
+      gameplayGuide: "مباراة سريعة بين فرق، ويحاول اللاعبون تسجيل الأهداف باستخدام السيارات قبل انتهاء الوقت.",
       platform: "Console / PC",
       imageUrl:
         "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=900&q=80",
@@ -239,6 +259,10 @@ function normaliseContent(content: GamingContent): GamingContent {
     games: (content.games ?? []).map((game) => ({
       ...game,
       gameplayType: game.gameplayType ?? "",
+      matchFormat: game.matchFormat ?? "",
+      gameVariant: game.gameVariant ?? "",
+      teamMode: game.teamMode ?? "",
+      gameplayGuide: game.gameplayGuide ?? "",
       imageUrl: game.imageUrl ?? "",
       iconUrl: game.iconUrl ?? game.imageUrl ?? "",
       accentColor: game.accentColor || "",

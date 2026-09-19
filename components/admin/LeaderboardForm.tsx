@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageField } from "@/components/admin/ImageField";
 
-const LADDER_LEVELS = 5;
+const MAX_LADDER_LEVELS = 20;
 
 function replaceAt<T>(list: T[], index: number, patch: (item: T) => T): T[] {
   return list.map((item, i) => (i === index ? patch(item) : item));
@@ -27,10 +27,9 @@ export function LeaderboardForm({ initial }: { initial: Leaderboard }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload.error ?? "تعذر حفظ السلم");
-      }
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error ?? "تعذر حفظ السلم");
+      if (payload.id) setData(payload);
       toast.success("تم تحديث Battle Pass");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر الحفظ");
@@ -42,7 +41,7 @@ export function LeaderboardForm({ initial }: { initial: Leaderboard }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Battle Pass Ladder — {LADDER_LEVELS} مستويات</CardTitle>
+        <CardTitle>Battle Pass Ladder — المستويات</CardTitle>
       </CardHeader>
 
       <div className="admin-stack">
@@ -60,9 +59,8 @@ export function LeaderboardForm({ initial }: { initial: Leaderboard }) {
           </div>
         </div>
 
-        {/* The ladder is fixed at five levels — tiers are edited, never added. */}
         <div className="admin-block">
-          <h4>المستويات الخمسة</h4>
+          <h4>الرتب والمستويات</h4>
           {data.tiers.map((tier, index) => (
             <div className="admin-row" key={tier.tier}>
               <div className="admin-field">
@@ -108,6 +106,24 @@ export function LeaderboardForm({ initial }: { initial: Leaderboard }) {
               />
             </div>
           ))}
+          <Button
+            variant="outline"
+            disabled={data.tiers.length >= MAX_LADDER_LEVELS}
+            onClick={() => {
+              const previous = data.tiers[data.tiers.length - 1];
+              setData({
+                ...data,
+                tiers: [...data.tiers, {
+                  tier: data.tiers.length + 1,
+                  label: `Tier ${data.tiers.length + 1}`,
+                  threshold: (previous?.threshold ?? 0) + 500,
+                  iconUrl: "",
+                }],
+              });
+            }}
+          >
+            + رتبة
+          </Button>
         </div>
 
         <div className="admin-block">

@@ -40,6 +40,7 @@ export function YouTubeEmbed({
   const playerRef = useRef<YoutubePlayer | null>(null);
   const readyRef = useRef(false);
   const watchSessionRef = useRef<string | null>(null);
+  const sessionStartingRef = useRef<Promise<boolean> | null>(null);
   const lastHeartbeatRef = useRef(0);
   const [notice, setNotice] = useState("");
   const [origin, setOrigin] = useState("");
@@ -56,10 +57,15 @@ export function YouTubeEmbed({
       const visible = document.visibilityState === "visible";
       const currentTime = Math.max(0, player.getCurrentTime());
       if (status !== "authenticated") return;
+      if (action !== "start" && !watchSessionRef.current) {
+        if (sessionStartingRef.current) await sessionStartingRef.current;
+        if (!watchSessionRef.current) return;
+      }
       const response = await fetch("/api/youtube/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, videoId, sessionId: watchSessionRef.current ?? undefined, currentTime, playing: player.getPlayerState() === 1, visible }) });
       const payload = await response.json().catch(() => ({}));
       if (payload.sessionId) watchSessionRef.current = payload.sessionId;
       if (!response.ok && action !== "stop") setNotice(payload.error ?? "تم إيقاف احتساب المشاهدة");
+      return response.ok;
     };
     void loadYoutubeApi().then((YT) => {
       if (!active || !hostRef.current) return;
@@ -74,7 +80,11 @@ export function YouTubeEmbed({
           widget_referrer: window.location.href,
         },
         events: {
-          onReady: () => { readyRef.current = true; playerRef.current = player; void send("start", player); },
+          onReady: () => {
+            readyRef.current = true;
+            playerRef.current = player;
+            sessionStartingRef.current = send("start", player).finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
+          },
           onStateChange: () => {},
           onError: (event) => {
             readyRef.current = false;
@@ -86,9 +96,9 @@ export function YouTubeEmbed({
         },
       });
       playerRef.current = player;
-      timer = window.setInterval(() => { if (readyRef.current && playerRef.current && Date.now() - lastHeartbeatRef.current > 3500) { lastHeartbeatRef.current = Date.now(); void send("heartbeat", playerRef.current); } }, 4000);
+      timer = window.setInterval(() => { if (readyRef.current && playerRef.current && watchSessionRef.current && Date.now() - lastHeartbeatRef.current > 3500) { lastHeartbeatRef.current = Date.now(); void send("heartbeat", playerRef.current); } }, 4000);
     }).catch(() => setNotice("تعذر تشغيل مشغل YouTube"));
-    const visibility = () => { if (readyRef.current && playerRef.current) void send("heartbeat", playerRef.current); };
+    const visibility = () => { if (readyRef.current && playerRef.current && watchSessionRef.current) void send("heartbeat", playerRef.current); };
     document.addEventListener("visibilitychange", visibility);
     return () => { active = false; document.removeEventListener("visibilitychange", visibility); if (timer) window.clearInterval(timer); if (readyRef.current && playerRef.current) void send("stop", playerRef.current); readyRef.current = false; playerRef.current?.destroy(); playerRef.current = null; };
   }, [videoId, status, origin]);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trophy, Link2, Users, Image as ImageIcon, Sparkles } from "lucide-react";
+import { Trophy, Link2, Users, Image as ImageIcon, Sparkles, Layers, Clapperboard } from "lucide-react";
 import type { GamingContent } from "@/lib/gaming-content";
 import type { Leaderboard } from "@/lib/leaderboard-content";
 import type { SocialSettings } from "@/lib/settings";
@@ -16,6 +16,7 @@ import { UserManagement } from "@/components/admin/UserManagement";
 import { RoleManagement } from "@/components/admin/RoleManagement";
 
 type Tab = "games" | "tournaments" | "social" | "roster" | "site" | "engagement" | "rewards" | "xp-settings" | "users";
+type GamesTab = "catalog" | "ranks" | "engagement";
 
 const TABS: { id: Tab; label: string; icon: typeof Trophy }[] = [
   { id: "games", label: "الألعاب", icon: ImageIcon },
@@ -31,6 +32,7 @@ const TABS: { id: Tab; label: string; icon: typeof Trophy }[] = [
 
 export function AdminDashboardTabs({ content, leaderboard, socialSettings }: { content: GamingContent; leaderboard: Leaderboard; socialSettings: SocialSettings }) {
   const [active, setActive] = useState<Tab>("games");
+  const [gamesTab, setGamesTab] = useState<GamesTab>("catalog");
 
   return (
     <div className="admin-tabs-shell" dir="rtl">
@@ -43,7 +45,25 @@ export function AdminDashboardTabs({ content, leaderboard, socialSettings }: { c
         ))}
       </nav>
       <main className="admin-tab-panel" role="tabpanel">
-        {active === "games" && <GamingDashboard initial={content} section="games" />}
+        {active === "games" && <div className="admin-stack">
+          <nav className="admin-tabs-nav admin-tabs-nav--nested" aria-label="إدارة الألعاب">
+            <button type="button" className={gamesTab === "catalog" ? "admin-tab is-active" : "admin-tab"} onClick={() => setGamesTab("catalog")} aria-selected={gamesTab === "catalog"} role="tab">
+              <Layers size={16} aria-hidden="true" />
+              <span>الألعاب</span>
+            </button>
+            <button type="button" className={gamesTab === "ranks" ? "admin-tab is-active" : "admin-tab"} onClick={() => setGamesTab("ranks")} aria-selected={gamesTab === "ranks"} role="tab">
+              <Trophy size={16} aria-hidden="true" />
+              <span>الرتب</span>
+            </button>
+            <button type="button" className={gamesTab === "engagement" ? "admin-tab is-active" : "admin-tab"} onClick={() => setGamesTab("engagement")} aria-selected={gamesTab === "engagement"} role="tab">
+              <Clapperboard size={16} aria-hidden="true" />
+              <span>المهمات والمقاطع</span>
+            </button>
+          </nav>
+          {gamesTab === "catalog" && <GamingDashboard initial={content} section="games" />}
+          {gamesTab === "ranks" && <RoleManagement />}
+          {gamesTab === "engagement" && <EngagementDashboard />}
+        </div>}
         {active === "tournaments" && (
           <div className="admin-stack">
             <GamingDashboard initial={content} section="tournaments" />

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { getLeaderboard, updateLeaderboard, LADDER_LEVELS } from "@/lib/leaderboard-content";
+import { getLeaderboard, updateLeaderboard, MAX_LADDER_LEVELS } from "@/lib/leaderboard-content";
+
+export const dynamic = "force-dynamic";
 
 const leaderboardSchema = z.object({
   id: z.string().min(1).max(80),
@@ -11,15 +13,15 @@ const leaderboardSchema = z.object({
   tiers: z
     .array(
       z.object({
-        tier: z.number().int().min(1).max(LADDER_LEVELS),
+        tier: z.number().int().min(1).max(MAX_LADDER_LEVELS),
         label: z.string().min(1).max(60),
         threshold: z.number().min(0).max(1_000_000),
         userId: z.string().max(200).optional(),
         iconUrl: z.string().max(1000),
       })
     )
-    // The ladder renders exactly five levels; reject anything that would break it.
-    .length(LADDER_LEVELS),
+    .min(1)
+    .max(MAX_LADDER_LEVELS),
   entries: z
     .array(
       z.object({
@@ -45,10 +47,15 @@ export async function PUT(req: NextRequest) {
   const parsed = leaderboardSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid leaderboard", details: parsed.error.flatten() },
+      { error: "Invalid leaderboard", details: parsed.error.flatten().fieldErrors },
       { status: 400 }
     );
   }
 
-  return NextResponse.json(await updateLeaderboard(parsed.data));
+  try {
+    return NextResponse.json(await updateLeaderboard(parsed.data));
+  } catch (error) {
+    console.error("Could not update leaderboard", error);
+    return NextResponse.json({ error: "تعذر حفظ الرتب" }, { status: 503 });
+  }
 }

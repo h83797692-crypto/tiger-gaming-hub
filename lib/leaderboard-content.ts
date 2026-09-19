@@ -24,8 +24,9 @@ export interface Leaderboard {
   entries: LeaderboardEntry[];
 }
 
-/** The ladder is designed around exactly five levels. */
+/** Five levels are provided by default; admins can add up to twenty. */
 export const LADDER_LEVELS = 5;
+export const MAX_LADDER_LEVELS = 20;
 
 export const DEFAULT_LEADERBOARD: Leaderboard = {
   id: "community-pass",
@@ -49,23 +50,14 @@ export const DEFAULT_LEADERBOARD: Leaderboard = {
 const DOC_ID = "community-pass";
 
 /**
- * Guarantees exactly five tiers, numbered 1..5 and ordered by threshold, so the
- * ladder never renders a broken rail if a document is short or over-filled.
+ * Keeps tiers ordered and numbered so the ladder renders consistently after an
+ * admin adds or removes a rank.
  */
 export function normaliseTiers(tiers: LeaderboardTier[]): LeaderboardTier[] {
-  const sorted = [...(tiers ?? [])].sort((a, b) => a.threshold - b.threshold).slice(0, LADDER_LEVELS);
-
-  while (sorted.length < LADDER_LEVELS) {
-    const previous = sorted[sorted.length - 1];
-    sorted.push({
-      tier: sorted.length + 1,
-      label: DEFAULT_LEADERBOARD.tiers[sorted.length]?.label ?? `Tier ${sorted.length + 1}`,
-      threshold: previous ? previous.threshold + 500 : 0,
-      iconUrl: "",
-    });
-  }
-
-  return sorted.map((tier, index) => ({ ...tier, tier: index + 1 }));
+  return [...(tiers ?? [])]
+    .sort((a, b) => a.threshold - b.threshold)
+    .slice(0, MAX_LADDER_LEVELS)
+    .map((tier, index) => ({ ...tier, tier: index + 1 }));
 }
 
 export async function getLeaderboard(): Promise<Leaderboard> {
@@ -105,5 +97,5 @@ export async function updateLeaderboard(content: Leaderboard) {
       { $set: { ...payload, updatedAt: new Date() } },
       { upsert: true }
     );
-  return getLeaderboard();
+  return payload;
 }

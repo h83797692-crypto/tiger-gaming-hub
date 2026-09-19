@@ -58,7 +58,7 @@ export function Header({ siteName, socialLinks }: { siteName: string; socialLink
 
   return (
     <header className="site-header sticky top-0 z-50">
-      <div className="site-header__bar mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6 md:py-4">
+      <div className="site-header__bar flex items-center justify-between gap-3 py-3 md:py-4">
         <Link href="/" className="tiger-logo text-xl font-black uppercase tracking-widest sm:text-2xl md:text-3xl">
           {siteName}
         </Link>

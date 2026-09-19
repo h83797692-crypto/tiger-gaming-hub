@@ -125,11 +125,11 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-
       try {
-        const destination = new URL(url);
-        return destination.origin === baseUrl ? destination.toString() : `${baseUrl}/profile`;
+        const destination = new URL(url, baseUrl);
+        if (destination.origin !== baseUrl) return `${baseUrl}/profile`;
+        const allowedPath = destination.pathname === "/admin" || destination.pathname === "/profile" || destination.pathname === "/";
+        return allowedPath ? destination.toString() : `${baseUrl}/profile`;
       } catch {
         return `${baseUrl}/profile`;
       }

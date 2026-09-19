@@ -20,7 +20,7 @@ export default function AdminLoginPage() {
 
   async function startGoogleAdminLogin() {
     await signOut({ redirect: false });
-    await signIn("google", { callbackUrl: "/admin" }, { prompt: "select_account", access_type: "offline" });
+    await signIn("google", { callbackUrl: `${window.location.origin}/admin` }, { prompt: "select_account", access_type: "offline" });
   }
 
   async function handleSubmit(e: React.FormEvent) {

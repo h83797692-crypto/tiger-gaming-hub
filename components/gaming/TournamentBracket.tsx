@@ -1,6 +1,7 @@
 "use client";
 
 import type { Match, Round } from "@/lib/gaming-content";
+import { UserAvatar } from "@/components/UserAvatar";
 
 function getInitial(name: string) {
   return (name ?? "").trim().slice(0, 1).toUpperCase() || "?";
@@ -34,7 +35,7 @@ function MatchCard({ match }: { match: Match }) {
       <div className="space-y-2">
         <div className={`flex items-center justify-between rounded-xl border px-2 py-2 text-sm ${isWinnerA ? "border-emerald-400 bg-emerald-500/15 text-emerald-50" : isLoserA ? "border-red-400 bg-red-500/15 text-red-100" : "border-white/8 bg-white/3 text-white/80"}`}>
           <div className="flex items-center gap-2">
-            <span className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${isWinnerA ? "bg-emerald-400/30 text-emerald-200" : isLoserA ? "bg-red-400/30 text-red-200" : "bg-white/10"}`}>{getInitial(match.playerA || "TBD")}</span>
+            <UserAvatar name={match.playerA || "TBD"} avatarUrl={match.avatarA} size="sm" profile={{ username: match.playerA || "TBD", avatarUrl: match.avatarA, frame: match.frameA ?? null, frameEnabled: match.frameEnabledA !== false, xp: match.xpA }} />
             <span>{match.playerA || "TBD"}</span>
           </div>
           <span className="text-xs text-cyan-300">{match.scoreA}</span>
@@ -44,7 +45,7 @@ function MatchCard({ match }: { match: Match }) {
 
         <div className={`flex items-center justify-between rounded-xl border px-2 py-2 text-sm ${isWinnerB ? "border-emerald-400 bg-emerald-500/15 text-emerald-50" : isLoserB ? "border-red-400 bg-red-500/15 text-red-100" : "border-white/8 bg-white/3 text-white/80"}`}>
           <div className="flex items-center gap-2">
-            <span className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${isWinnerB ? "bg-emerald-400/30 text-emerald-200" : isLoserB ? "bg-red-400/30 text-red-200" : "bg-white/10"}`}>{getInitial(match.playerB || "TBD")}</span>
+            <UserAvatar name={match.playerB || "TBD"} avatarUrl={match.avatarB} size="sm" profile={{ username: match.playerB || "TBD", avatarUrl: match.avatarB, frame: match.frameB ?? null, frameEnabled: match.frameEnabledB !== false, xp: match.xpB }} />
             <span>{match.playerB || "TBD"}</span>
           </div>
           <span className="text-xs text-cyan-300">{match.scoreB}</span>

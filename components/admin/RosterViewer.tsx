@@ -119,13 +119,13 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
   const [bracketRounds, setBracketRounds] = useState<BracketRound[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingBracket, setSavingBracket] = useState(false);
-  const [bracketSize, setBracketSize] = useState(16);
+  const [bracketSize, setBracketSize] = useState(4);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [creatingTournament, setCreatingTournament] = useState(false);
   const [createError, setCreateError] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newGame, setNewGame] = useState(games[0]?.title ?? "");
-  const [newSize, setNewSize] = useState("16");
+  const [newSize, setNewSize] = useState("4");
 
   const gameTournaments = useMemo(
     () => tournamentList.filter((item) => item.game === selectedGame),
@@ -168,7 +168,7 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
           return current;
         });
         const loadedSize = payload.maxPlayers ?? tournament?.maxPlayers;
-        setBracketSize([8, 16, 32, 64].includes(loadedSize) ? loadedSize : 16);
+        setBracketSize([4, 8, 16, 32, 64].includes(loadedSize) ? loadedSize : 4);
         setBracketRounds(Array.isArray(payload.rounds) && payload.rounds.length > 0 ? payload.rounds : []);
       })
       .catch(() => undefined)
@@ -186,7 +186,10 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
   };
 
   const startTournament = async () => {
-    if (!selectedTournament || visible.length === 0) return;
+    if (!selectedTournament || visible.length < 4) {
+      setCreateError("لا يمكن بدء البطولة قبل تسجيل 4 لاعبين على الأقل.");
+      return;
+    }
     const rounds = buildSingleEliminationBracket(
       visible.map((registration) => registration.playerName || registration.inGameId),
       ["الدور الأول", "نصف النهائي", "النهائي"],
@@ -316,7 +319,7 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
         <label className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-white/70">
           سعة البطولة
           <select className="bg-transparent text-cyan-200 outline-none" value={bracketSize} onChange={(event) => setBracketSize(Number(event.target.value))}>
-            {[8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}
+            {[4, 8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}
           </select>
         </label>
         <button type="button" className="rounded-lg border border-cyan-400/50 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200" onClick={generateBracket}>

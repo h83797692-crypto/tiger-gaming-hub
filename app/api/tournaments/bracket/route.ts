@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
+import { grantChampionFrame } from "@/lib/user-profile";
+import type { BracketRound } from "@/lib/tournament-bracket";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,14 @@ const matchSchema = z.object({
   playerB: z.string().max(120),
   avatarA: z.string().max(500).optional(),
   avatarB: z.string().max(500).optional(),
+  userIdA: z.string().max(200).optional(),
+  userIdB: z.string().max(200).optional(),
+  frameA: z.enum(["champion"]).nullable().optional(),
+  frameB: z.enum(["champion"]).nullable().optional(),
+  frameEnabledA: z.boolean().optional(),
+  frameEnabledB: z.boolean().optional(),
+  xpA: z.number().min(0).optional(),
+  xpB: z.number().min(0).optional(),
   scoreA: z.number().int().min(0).max(999),
   scoreB: z.number().int().min(0).max(999),
   status: z.enum(["upcoming", "live", "done"]),
@@ -32,14 +42,51 @@ const roundSchema = z.object({
 const bracketPayloadSchema = z.object({
   tournamentId: z.string().min(1).max(120),
   rounds: z.array(roundSchema).max(12),
-  maxPlayers: z.number().int().min(1).max(100000).optional(),
+  maxPlayers: z.union([z.literal(4), z.literal(8), z.literal(16), z.literal(32), z.literal(64)]).optional(),
 });
 
 const createTournamentSchema = z.object({
   game: z.string().trim().min(1).max(120),
   title: z.string().trim().min(1).max(160),
-  maxPlayers: z.union([z.literal(8), z.literal(16), z.literal(32), z.literal(64)]),
+  maxPlayers: z.union([z.literal(4), z.literal(8), z.literal(16), z.literal(32), z.literal(64)]),
 });
+
+async function hydrateRounds(rounds: BracketRound[], registrations: Array<Record<string, unknown>>) {
+  const db = await getDb();
+  const userIds = registrations.map((registration) => String(registration.userId ?? "")).filter(Boolean);
+  const profiles = userIds.length > 0 ? await db.collection("users").find({ userId: { $in: userIds } }).toArray() : [];
+  const profileById = new Map(profiles.map((profile) => [String(profile.userId), profile]));
+  const registrationByName = new Map(registrations.flatMap((registration) => {
+    const profile = registration.userId ? profileById.get(String(registration.userId)) : undefined;
+    const player = String(registration.playerName ?? registration.inGameId ?? "");
+    return player ? [[player, { registration, profile }] as const] : [];
+  }));
+
+  return rounds.map((round) => ({
+    ...round,
+    matches: round.matches.map((match) => {
+      const playerA = registrationByName.get(match.playerA);
+      const playerB = registrationByName.get(match.playerB);
+      return {
+        ...match,
+        ...(playerA && {
+          avatarA: String(playerA.profile?.avatarUrl ?? playerA.registration.profileAvatarUrl ?? ""),
+          userIdA: String(playerA.registration.userId ?? "") || undefined,
+          frameA: playerA.profile?.frame === "champion" || playerA.registration.profileFrame === "champion" ? "champion" as const : null,
+          frameEnabledA: playerA.profile?.frameEnabled !== false && playerA.registration.profileFrameEnabled !== false,
+          xpA: Number(playerA.profile?.xp ?? 0),
+        }),
+        ...(playerB && {
+          avatarB: String(playerB.profile?.avatarUrl ?? playerB.registration.profileAvatarUrl ?? ""),
+          userIdB: String(playerB.registration.userId ?? "") || undefined,
+          frameB: playerB.profile?.frame === "champion" || playerB.registration.profileFrame === "champion" ? "champion" as const : null,
+          frameEnabledB: playerB.profile?.frameEnabled !== false && playerB.registration.profileFrameEnabled !== false,
+          xpB: Number(playerB.profile?.xp ?? 0),
+        }),
+      };
+    }),
+  }));
+}
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions).catch(() => null);
@@ -100,10 +147,11 @@ export async function GET(request: NextRequest) {
       .find({ tournamentId })
       .sort({ createdAt: 1 })
       .toArray();
+    const hydratedRounds = await hydrateRounds((doc?.rounds ?? []) as BracketRound[], registrations as Array<Record<string, unknown>>);
 
     return NextResponse.json({
       tournamentId,
-      rounds: doc?.rounds ?? [],
+      rounds: hydratedRounds,
       maxPlayers: doc?.maxPlayers,
       registrations: registrations.map(({ _id, ...registration }) => ({ ...registration, id: _id.toString() })),
     });
@@ -122,8 +170,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Unable to verify admin session" }, { status: 500 });
   }
 
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session?.user?.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let body: unknown;
@@ -141,14 +189,19 @@ export async function PUT(request: NextRequest) {
 
   try {
     const db = await getDb();
+    const registrations = await db.collection("tournament-registrations").find({ tournamentId: parsed.data.tournamentId }).toArray();
+    if (registrations.length < 4) {
+      return NextResponse.json({ error: "تحتاج البطولة إلى 4 لاعبين على الأقل قبل بدء الشجرة." }, { status: 400 });
+    }
+    const hydratedRounds = await hydrateRounds(parsed.data.rounds as BracketRound[], registrations as Array<Record<string, unknown>>);
     const result = await db.collection("tournament-brackets").updateOne(
       { tournamentId: parsed.data.tournamentId },
-      { $set: { tournamentId: parsed.data.tournamentId, rounds: parsed.data.rounds, updatedAt: new Date() } },
+      { $set: { tournamentId: parsed.data.tournamentId, rounds: hydratedRounds, updatedAt: new Date() } },
       { upsert: true }
     );
 
     const tournamentUpdate: Record<string, unknown> = {
-      "tournaments.$.rounds": parsed.data.rounds,
+      "tournaments.$.rounds": hydratedRounds,
       updatedAt: new Date(),
     };
     if (parsed.data.maxPlayers !== undefined) tournamentUpdate["tournaments.$.maxPlayers"] = parsed.data.maxPlayers;
@@ -158,10 +211,34 @@ export async function PUT(request: NextRequest) {
       { $set: tournamentUpdate }
     );
 
+    const finalMatch = hydratedRounds.at(-1)?.matches.at(-1);
+    const championName = finalMatch?.status === "done"
+      ? finalMatch.winner || (finalMatch.scoreA > finalMatch.scoreB ? finalMatch.playerA : finalMatch.scoreB > finalMatch.scoreA ? finalMatch.playerB : "")
+      : "";
+    if (championName && championName !== "TBD" && championName !== "BYE") {
+      const championRegistration = await db.collection("tournament-registrations").findOne({
+        tournamentId: parsed.data.tournamentId,
+        $or: [{ playerName: championName }, { inGameId: championName }],
+      });
+      if (championRegistration?.userId) await grantChampionFrame(String(championRegistration.userId));
+    }
+
+    const finalRounds = championName ? await hydrateRounds(hydratedRounds, registrations as Array<Record<string, unknown>>) : hydratedRounds;
+    if (championName) {
+      await db.collection("tournament-brackets").updateOne(
+        { tournamentId: parsed.data.tournamentId },
+        { $set: { rounds: finalRounds, updatedAt: new Date() } }
+      );
+      await db.collection("gaming").updateOne(
+        { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
+        { $set: { "tournaments.$.rounds": finalRounds, updatedAt: new Date() } }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       updated: result.modifiedCount > 0 || result.upsertedCount > 0,
-      rounds: parsed.data.rounds,
+      rounds: finalRounds,
     });
   } catch (error) {
     console.error("Could not save tournament bracket", error);

@@ -28,6 +28,14 @@ export interface Match {
   playerB: string;
   avatarA?: string;
   avatarB?: string;
+  userIdA?: string;
+  userIdB?: string;
+  frameA?: "champion" | null;
+  frameB?: "champion" | null;
+  frameEnabledA?: boolean;
+  frameEnabledB?: boolean;
+  xpA?: number;
+  xpB?: number;
   scoreA: number;
   scoreB: number;
   status: "upcoming" | "live" | "done";
@@ -66,6 +74,7 @@ export interface VideoItem {
   /** Derived from youtubeUrl on write — never entered by hand. */
   youtubeId?: string;
   thumbnailUrl: string;
+  publishedAt?: string;
   rarity: Rarity;
 }
 
@@ -318,6 +327,7 @@ function normaliseContent(content: GamingContent): GamingContent {
         youtubeId: getYoutubeId(youtubeUrl) ?? undefined,
         url: video.url ?? "",
         thumbnailUrl: video.thumbnailUrl ?? "",
+        publishedAt: video.publishedAt ?? "",
         rarity: coerceRarity(video.rarity),
       };
     }),

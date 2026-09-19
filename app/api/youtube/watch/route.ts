@@ -1,0 +1,95 @@
+import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
+import { getServerSession } from "next-auth";
+import { z } from "zod";
+import { authOptions } from "@/lib/auth";
+import { getDb } from "@/lib/mongodb";
+import { awardXp } from "@/lib/engagement";
+import { getEngagementSettings } from "@/lib/engagement-settings";
+
+export const dynamic = "force-dynamic";
+
+const payloadSchema = z.object({
+  action: z.enum(["start", "heartbeat", "stop"]),
+  videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+  sessionId: z.string().uuid().optional(),
+  currentTime: z.number().finite().min(0).max(24 * 60 * 60).optional().default(0),
+  playing: z.boolean().optional().default(false),
+  visible: z.boolean().optional().default(false),
+});
+
+const HEARTBEAT_LIMIT_SECONDS = 12;
+const SESSION_TTL_MS = 45 * 60 * 1000;
+
+export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions).catch(() => null);
+  if (!session?.user?.id) return NextResponse.json({ error: "يجب تسجيل الدخول لجمع XP" }, { status: 401 });
+
+  const parsed = payloadSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "بيانات المشاهدة غير صالحة" }, { status: 400 });
+
+  const input = parsed.data;
+  const db = await getDb();
+  const now = new Date();
+
+  if (input.action === "start") {
+    const sessionId = randomUUID();
+    await db.collection("youtube-watch-sessions").updateMany(
+      { userId: session.user.id, invalid: false, stoppedAt: { $exists: false } },
+      { $set: { invalid: true, invalidReason: "new_session" } }
+    );
+    await db.collection("youtube-watch-sessions").insertOne({
+      sessionId,
+      userId: session.user.id,
+      videoId: input.videoId,
+      lastCurrentTime: input.currentTime,
+      creditedSeconds: 0,
+      xpRemainder: 0,
+      lastHeartbeatAt: now,
+      expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
+      invalid: false,
+      createdAt: now,
+    });
+    return NextResponse.json({ sessionId, creditedSeconds: 0 });
+  }
+
+  if (!input.sessionId) return NextResponse.json({ error: "جلسة المشاهدة مفقودة" }, { status: 400 });
+  const watch = await db.collection("youtube-watch-sessions").findOne({ sessionId: input.sessionId, userId: session.user.id, videoId: input.videoId });
+  if (!watch || watch.invalid || !(watch.expiresAt instanceof Date) || watch.expiresAt <= now) {
+    return NextResponse.json({ error: "جلسة المشاهدة غير صالحة" }, { status: 409 });
+  }
+
+  if (input.action === "stop") {
+    await db.collection("youtube-watch-sessions").updateOne({ _id: watch._id }, { $set: { stoppedAt: now, lastHeartbeatAt: now } });
+    return NextResponse.json({ creditedSeconds: Number(watch.creditedSeconds ?? 0) });
+  }
+
+  const elapsed = Math.max(0, Math.min(HEARTBEAT_LIMIT_SECONDS, (now.getTime() - new Date(watch.lastHeartbeatAt).getTime()) / 1000));
+  const positionDelta = input.currentTime - Number(watch.lastCurrentTime ?? 0);
+  const isSuspiciousSeek = positionDelta > elapsed + 2 || positionDelta < -2;
+  if (isSuspiciousSeek) {
+    await db.collection("youtube-watch-sessions").updateOne({ _id: watch._id }, { $set: { invalid: true, invalidReason: "seek", lastHeartbeatAt: now } });
+    return NextResponse.json({ error: "تم إيقاف مكافأة المشاهدة بسبب التخطي" }, { status: 409 });
+  }
+
+  const credit = input.playing && input.visible ? Math.floor(Math.min(Math.max(positionDelta, 0), elapsed + 1)) : 0;
+  if (credit <= 0) {
+    await db.collection("youtube-watch-sessions").updateOne({ _id: watch._id }, { $set: { lastCurrentTime: input.currentTime, lastHeartbeatAt: now } });
+    return NextResponse.json({ creditedSeconds: Number(watch.creditedSeconds ?? 0), addedXp: 0 });
+  }
+
+  const settings = await getEngagementSettings();
+  const earnedForInterval = credit * settings.watch_xp_per_minute / 60;
+  const availableXp = Number(watch.xpRemainder ?? 0) + earnedForInterval;
+  const addedXp = Math.floor(availableXp);
+  const nextRemainder = availableXp - addedXp;
+  const updated = await db.collection("youtube-watch-sessions").findOneAndUpdate(
+    { _id: watch._id, invalid: false, lastCurrentTime: watch.lastCurrentTime, lastHeartbeatAt: watch.lastHeartbeatAt },
+    { $inc: { creditedSeconds: credit }, $set: { lastCurrentTime: input.currentTime, lastHeartbeatAt: now, xpRemainder: nextRemainder } },
+    { returnDocument: "after" }
+  );
+  if (!updated) return NextResponse.json({ error: "تم رفض heartbeat مكرر" }, { status: 409 });
+
+  if (addedXp > 0) await awardXp(session.user.id, addedXp);
+  return NextResponse.json({ creditedSeconds: Number(updated.creditedSeconds ?? 0), addedXp });
+}

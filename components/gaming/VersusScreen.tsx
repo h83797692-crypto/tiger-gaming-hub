@@ -5,12 +5,9 @@ import type { Game, Match, Round, Tournament } from "@/lib/gaming-content";
 import { RegistrationModal } from "@/components/gaming/RegistrationModal";
 import { TournamentBracket } from "@/components/gaming/TournamentBracket";
 import { buildSingleEliminationBracket } from "@/lib/tournament-bracket";
+import { UserAvatar } from "@/components/UserAvatar";
 
 const ROUND_FALLBACKS = ["Round 1", "Quarters", "Semis", "Final"];
-
-function initial(name: string) {
-  return (name ?? "").trim().slice(0, 1).toUpperCase() || "?";
-}
 
 /** Live-ticking countdown. Returns null once the start time has passed. */
 function useCountdown(target: string, enabled: boolean) {
@@ -92,9 +89,7 @@ function MatchCard({ match }: { match: Match }) {
 
       <div className="versus-body">
         <div className={`versus-side versus-side--a${winnerA ? " versus-side--winner" : ""}`}>
-          <span className="versus-avatar" aria-hidden="true">
-            <span>{initial(match.playerA)}</span>
-          </span>
+          <UserAvatar className="versus-avatar" name={match.playerA} avatarUrl={match.avatarA} size="md" profile={{ username: match.playerA, avatarUrl: match.avatarA, frame: match.frameA ?? null, frameEnabled: match.frameEnabledA !== false, xp: match.xpA }} />
           <span className="versus-side__name">{match.playerA || "TBD"}</span>
           <b className="versus-side__score">{match.scoreA}</b>
         </div>
@@ -104,9 +99,7 @@ function MatchCard({ match }: { match: Match }) {
         </span>
 
         <div className={`versus-side versus-side--b${winnerB ? " versus-side--winner" : ""}`}>
-          <span className="versus-avatar" aria-hidden="true">
-            <span>{initial(match.playerB)}</span>
-          </span>
+          <UserAvatar className="versus-avatar" name={match.playerB} avatarUrl={match.avatarB} size="md" profile={{ username: match.playerB, avatarUrl: match.avatarB, frame: match.frameB ?? null, frameEnabled: match.frameEnabledB !== false, xp: match.xpB }} />
           <span className="versus-side__name">{match.playerB || "TBD"}</span>
           <b className="versus-side__score">{match.scoreB}</b>
         </div>

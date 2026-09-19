@@ -56,7 +56,7 @@ const blankTournament = (): Tournament => ({
   status: "open",
   date: "",
   prize: "",
-  maxPlayers: 16,
+  maxPlayers: 4,
   rules: "",
   rounds: [{ name: "الجولة 1", matches: [blankMatch()] }],
 });
@@ -424,6 +424,7 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
         </div>
       </Card>
 
+      {section !== "games" && section !== "site" && <>
       <Card>
         <CardHeader>
           <CardTitle>البطولات والمواجهات</CardTitle>
@@ -547,8 +548,8 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
                       )
                     }
                   >
-                    {[16, 32, 50, 100].map((size) => <option key={size} value={size}>{size} لاعب</option>)}
-                    {!([16, 32, 50, 100] as number[]).includes(tournament.maxPlayers) && <option value={tournament.maxPlayers}>{tournament.maxPlayers} لاعب</option>}
+                    {[4, 8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}
+                    {!([4, 8, 16, 32, 64] as number[]).includes(tournament.maxPlayers) && <option value={tournament.maxPlayers}>{tournament.maxPlayers} لاعب</option>}
                   </select>
                 </div>
 
@@ -753,6 +754,7 @@ export function GamingDashboard({ initial, section = "all" }: { initial: GamingC
           </Button>
         </div>
       </Card>
+      </>}
 
       </>}
 

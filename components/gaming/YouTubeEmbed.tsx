@@ -1,4 +1,25 @@
-import { getYouTubeEmbedUrl } from "@/lib/youtube";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { getYoutubeId } from "@/lib/youtube";
+import { useSession } from "next-auth/react";
+
+type YoutubePlayer = { getCurrentTime: () => number; getPlayerState: () => number; destroy: () => void };
+type YoutubeNamespace = { Player: new (element: HTMLElement, options: { videoId: string; playerVars: Record<string, string | number>; events: { onReady: () => void; onStateChange: (event: { data: number }) => void; onError: (event: { data: number }) => void } }) => YoutubePlayer };
+
+declare global { interface Window { YT?: YoutubeNamespace; onYouTubeIframeAPIReady?: () => void } }
+
+let apiPromise: Promise<YoutubeNamespace> | null = null;
+function loadYoutubeApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  apiPromise ??= new Promise<YoutubeNamespace>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[src="https://www.youtube.com/iframe_api"]');
+    const previous = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { previous?.(); if (window.YT) resolve(window.YT); else reject(new Error("YouTube API unavailable")); };
+    if (!existing) { const script = document.createElement("script"); script.src = "https://www.youtube.com/iframe_api"; script.async = true; script.onerror = () => reject(new Error("YouTube API failed")); document.head.appendChild(script); }
+  });
+  return apiPromise;
+}
 
 /**
  * Responsive 16:9 embed driven by the parsed video ID.
@@ -13,19 +34,86 @@ export function YouTubeEmbed({
   fallbackUrl?: string;
   title: string;
 }) {
-  const embed = getYouTubeEmbedUrl(youtubeUrl);
+  const videoId = getYoutubeId(youtubeUrl);
+  const { status } = useSession();
+  const hostRef = useRef<HTMLIFrameElement>(null);
+  const playerRef = useRef<YoutubePlayer | null>(null);
+  const readyRef = useRef(false);
+  const watchSessionRef = useRef<string | null>(null);
+  const lastHeartbeatRef = useRef(0);
+  const [notice, setNotice] = useState("");
+  const [origin, setOrigin] = useState("");
 
-  if (embed) {
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  useEffect(() => {
+    if (!videoId || !origin || !hostRef.current) return;
+    let active = true;
+    let timer: number | undefined;
+    const send = async (action: "start" | "heartbeat" | "stop", player: YoutubePlayer) => {
+      const visible = document.visibilityState === "visible";
+      const currentTime = Math.max(0, player.getCurrentTime());
+      if (status !== "authenticated") return;
+      const response = await fetch("/api/youtube/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, videoId, sessionId: watchSessionRef.current ?? undefined, currentTime, playing: player.getPlayerState() === 1, visible }) });
+      const payload = await response.json().catch(() => ({}));
+      if (payload.sessionId) watchSessionRef.current = payload.sessionId;
+      if (!response.ok && action !== "stop") setNotice(payload.error ?? "تم إيقاف احتساب المشاهدة");
+    };
+    void loadYoutubeApi().then((YT) => {
+      if (!active || !hostRef.current) return;
+      const player = new YT.Player(hostRef.current, {
+        videoId,
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          enablejsapi: 1,
+          origin,
+          widget_referrer: window.location.href,
+        },
+        events: {
+          onReady: () => { readyRef.current = true; playerRef.current = player; void send("start", player); },
+          onStateChange: () => {},
+          onError: (event) => {
+            readyRef.current = false;
+            const message = event.data === 101 || event.data === 150
+              ? "هذا الفيديو لا يسمح بالتضمين الخارجي. افتحه مباشرة على YouTube."
+              : "تعذر تشغيل هذا الفيديو؛ تحقق من رابط YouTube.";
+            setNotice(message);
+          },
+        },
+      });
+      playerRef.current = player;
+      timer = window.setInterval(() => { if (readyRef.current && playerRef.current && Date.now() - lastHeartbeatRef.current > 3500) { lastHeartbeatRef.current = Date.now(); void send("heartbeat", playerRef.current); } }, 4000);
+    }).catch(() => setNotice("تعذر تشغيل مشغل YouTube"));
+    const visibility = () => { if (readyRef.current && playerRef.current) void send("heartbeat", playerRef.current); };
+    document.addEventListener("visibilitychange", visibility);
+    return () => { active = false; document.removeEventListener("visibilitychange", visibility); if (timer) window.clearInterval(timer); if (readyRef.current && playerRef.current) void send("stop", playerRef.current); readyRef.current = false; playerRef.current?.destroy(); playerRef.current = null; };
+  }, [videoId, status, origin]);
+
+  if (videoId && origin) {
+    const embedParams = new URLSearchParams({
+      enablejsapi: "1",
+      modestbranding: "1",
+      origin,
+      playsinline: "1",
+      rel: "0",
+      widget_referrer: window.location.href,
+    });
+
     return (
-      <div className="video-frame">
+      <div className="video-frame youtube-player-frame">
         <iframe
-          src={embed}
+          ref={hostRef}
           title={title}
-          loading="lazy"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          src={`https://www.youtube.com/embed/${videoId}?${embedParams.toString()}`}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
         />
+        {notice && <small className="youtube-watch-notice">{notice}</small>}
       </div>
     );
   }

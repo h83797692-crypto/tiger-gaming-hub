@@ -14,6 +14,7 @@ const leaderboardSchema = z.object({
         tier: z.number().int().min(1).max(LADDER_LEVELS),
         label: z.string().min(1).max(60),
         threshold: z.number().min(0).max(1_000_000),
+        userId: z.string().max(200).optional(),
         iconUrl: z.string().max(1000),
       })
     )
@@ -25,6 +26,9 @@ const leaderboardSchema = z.object({
         name: z.string().min(1).max(100),
         avatarUrl: z.string().max(1000),
         points: z.number().min(0).max(10_000_000),
+        userId: z.string().max(200).optional(),
+        frame: z.enum(["champion"]).nullable().optional(),
+        frameEnabled: z.boolean().optional(),
       })
     )
     .max(200),
@@ -36,7 +40,7 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session?.user?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const parsed = leaderboardSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

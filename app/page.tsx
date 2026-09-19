@@ -4,9 +4,12 @@ import { DonationButton } from "@/components/DonationButton";
 import { VersusScreen } from "@/components/gaming/VersusScreen";
 import { BattlePassLadder } from "@/components/gaming/BattlePassLadder";
 import { ContentCard, CardImage } from "@/components/gaming/ContentCard";
-import { YouTubeEmbed } from "@/components/gaming/YouTubeEmbed";
-import { getYoutubeThumbnail } from "@/lib/youtube";
+import { YoutubeVideoGrid } from "@/components/gaming/YoutubeVideoGrid";
 import { HeroSection } from "@/components/gaming/HeroSection";
+import { LiveChatRoom } from "@/components/gaming/LiveChatRoom";
+import { EngagementPanel } from "@/components/EngagementPanel";
+import { ClipHall } from "@/components/ClipHall";
+import { getLatestYoutubeVideos } from "@/lib/youtube-feed";
 
 // Always read fresh content - an admin edit should be visible on the next page
 // load, not stuck behind a stale cache.
@@ -22,11 +25,17 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function HomePage() {
   const content = await getGamingContent();
   const leaderboard = await getLeaderboard();
+  const youtubeVideos = await getLatestYoutubeVideos(6);
+  const videos = youtubeVideos.length > 0
+    ? youtubeVideos
+    : content.videos.filter((video) => !video.youtubeUrl.toLowerCase().includes("/shorts/"));
 
   return (
     <main>
       <DonationButton />
       <HeroSection title={content.heroTitle} subtitle={content.heroSubtitle} cta={content.heroCta} announcement={content.announcement} games={content.games} />
+
+      <EngagementPanel />
 
       <section id="games" className="section-shell">
         <div className="section-heading">
@@ -82,7 +91,10 @@ export default async function HomePage() {
                 </span>
               </div>
 
-              <VersusScreen tournament={tournament} games={content.games} />
+              <div className="live-arena-layout">
+                <VersusScreen tournament={tournament} games={content.games} />
+                <LiveChatRoom roomId={tournament.id} />
+              </div>
             </article>
           ))}
         </div>
@@ -98,31 +110,10 @@ export default async function HomePage() {
           <h2>أحدث المحتوى</h2>
         </div>
 
-        <div className="video-grid">
-          {content.videos.map((video) => (
-            <ContentCard
-              key={video.id}
-              rarity={video.rarity}
-              showRarityBadge={false}
-              media={
-                <YouTubeEmbed
-                  youtubeUrl={video.youtubeUrl}
-                  fallbackUrl={video.url}
-                  title={video.title}
-                />
-              }
-              meta={
-                getYoutubeThumbnail(video.youtubeUrl)
-                  ? "YOUTUBE"
-                  : video.url.startsWith("/uploads/")
-                    ? "UPLOAD"
-                    : undefined
-              }
-              title={video.title}
-            />
-          ))}
-        </div>
+        <YoutubeVideoGrid initialVideos={videos} />
       </section>
+
+      <ClipHall />
     </main>
   );
 }

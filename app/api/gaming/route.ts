@@ -19,6 +19,8 @@ const matchSchema = z.object({
   playerB: z.string().max(120),
   avatarA: z.string().max(500).optional(),
   avatarB: z.string().max(500).optional(),
+  xpA: z.number().min(0).optional(),
+  xpB: z.number().min(0).optional(),
   scoreA: z.number().int().min(0).max(999),
   scoreB: z.number().int().min(0).max(999),
   status: z.enum(["upcoming", "live", "done"]),
@@ -73,7 +75,7 @@ const gamingSchema = z.object({
         status: z.enum(["open", "live", "completed"]),
         date: z.string().max(40),
         prize: z.string().max(120),
-        maxPlayers: z.number().int().min(0).max(100000),
+        maxPlayers: z.union([z.literal(4), z.literal(8), z.literal(16), z.literal(32), z.literal(64)]),
         rules: z.string().max(500),
         rounds: z.array(roundSchema).max(12),
       })
@@ -122,10 +124,10 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  if (!session) {
+  if (session?.user?.role !== "admin") {
     return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401, headers: methodHeaders }
+      { error: "Forbidden" },
+      { status: 403, headers: methodHeaders }
     );
   }
 

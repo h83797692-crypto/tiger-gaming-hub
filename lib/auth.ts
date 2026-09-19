@@ -1,8 +1,29 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { getDb } from "@/lib/mongodb";
+import { roleFor } from "@/lib/roles";
+import { getUserProfile, upsertGoogleUser } from "@/lib/user-profile";
+
+const googleProvider = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+  ? GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
+    })
+  : null;
+
+export function isAdminEmail(email?: string | null) {
+  return roleFor(email) === "admin";
+}
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -58,19 +79,58 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    ...(googleProvider ? [googleProvider] : []),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google" && profile && ((profile as { email_verified?: boolean }).email_verified !== true || !profile.email)) {
+        return false;
+      }
+
+      if (account?.provider === "google" && user.email) {
+        const profile = await upsertGoogleUser({
+          userId: account.providerAccountId,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        });
+        if (profile) user.id = profile.id;
+        (user as any).role = isAdminEmail(user.email) ? "admin" : "member";
+      }
+      return true;
+    },
+    async jwt({ token, user, account }) {
       if (user) {
-        token.role = (user as any).role ?? "admin";
+        token.role = (user as any).role ?? (account?.provider === "google" ? "member" : "admin");
+        token.userId = user.id;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).role = token.role;
+        (session.user as any).role = token.role === "admin" || roleFor(session.user.email) === "admin" ? "admin" : "member";
+        (session.user as any).id = token.userId ?? token.sub;
+
+        if (token.userId && (session.user as any).role !== "admin") {
+          const profile = await getUserProfile(String(token.userId));
+          if (profile) {
+            session.user.name = profile.username;
+            session.user.image = profile.avatarUrl;
+            (session.user as any).profile = profile;
+          }
+        }
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+
+      try {
+        const destination = new URL(url);
+        return destination.origin === baseUrl ? destination.toString() : `${baseUrl}/profile`;
+      } catch {
+        return `${baseUrl}/profile`;
+      }
     },
   },
   secret: process.env.NEXTAUTH_SECRET,

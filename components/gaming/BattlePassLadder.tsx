@@ -1,6 +1,7 @@
 import type { Leaderboard, LeaderboardTier } from "@/lib/leaderboard-content";
 import { normaliseTiers } from "@/lib/leaderboard-content";
 import { AnimatedXP } from "@/components/gaming/AnimatedXP";
+import { UserAvatar } from "@/components/UserAvatar";
 
 function tierForPoints(points: number, tiers: LeaderboardTier[]): LeaderboardTier {
   // Tiers arrive sorted ascending; walk down to find the highest one reached.
@@ -90,14 +91,7 @@ export function BattlePassLadder({ leaderboard }: { leaderboard: Leaderboard }) 
             >
               <span className="entry-rank">#{index + 1}</span>
 
-              <span className="entry-avatar">
-                {entry.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={entry.avatarUrl} alt="" />
-                ) : (
-                  entry.name.slice(0, 1).toUpperCase()
-                )}
-              </span>
+              <UserAvatar className="entry-avatar" name={entry.name} avatarUrl={entry.avatarUrl} size="sm" profile={entry.userId ? { id: entry.userId, username: entry.name, avatarUrl: entry.avatarUrl, frame: entry.frame ?? null, frameEnabled: entry.frameEnabled ?? true, xp: entry.points } : undefined} />
 
               <div className="entry-copy">
                 <strong>{entry.name}</strong>

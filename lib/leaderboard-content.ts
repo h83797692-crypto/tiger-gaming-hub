@@ -11,6 +11,9 @@ export interface LeaderboardEntry {
   name: string;
   avatarUrl: string;
   points: number;
+  userId?: string;
+  frame?: "champion" | null;
+  frameEnabled?: boolean;
 }
 
 export interface Leaderboard {
@@ -72,7 +75,20 @@ export async function getLeaderboard(): Promise<Leaderboard> {
     if (!doc) return DEFAULT_LEADERBOARD;
     const { _id, ...rest } = doc as any;
     const merged = { ...DEFAULT_LEADERBOARD, ...rest } as Leaderboard;
-    return { ...merged, tiers: normaliseTiers(merged.tiers) };
+    const entries = merged.entries ?? [];
+    const userIds = entries.map((entry) => entry.userId).filter((userId): userId is string => Boolean(userId));
+    if (userIds.length === 0) return { ...merged, tiers: normaliseTiers(merged.tiers), entries: [...entries].sort((a, b) => b.points - a.points) };
+
+    const profiles = await db.collection("users").find({ userId: { $in: userIds } }).toArray();
+    const profileById = new Map(profiles.map((profile) => [String(profile.userId), profile]));
+    return {
+      ...merged,
+      tiers: normaliseTiers(merged.tiers),
+      entries: entries.map((entry) => {
+        const profile = entry.userId ? profileById.get(entry.userId) : undefined;
+        return profile ? { ...entry, name: profile.username, avatarUrl: profile.avatarUrl, frame: profile.frame, frameEnabled: profile.frameEnabled } : entry;
+      }).sort((a, b) => b.points - a.points),
+    };
   } catch (error) {
     console.error("MongoDB unavailable; serving default leaderboard.", error);
     return DEFAULT_LEADERBOARD;
@@ -81,7 +97,7 @@ export async function getLeaderboard(): Promise<Leaderboard> {
 
 export async function updateLeaderboard(content: Leaderboard) {
   const db = await getDb();
-  const payload = { ...content, tiers: normaliseTiers(content.tiers) };
+  const payload = { ...content, tiers: normaliseTiers(content.tiers), entries: [...content.entries].sort((a, b) => b.points - a.points) };
   await db
     .collection("leaderboards")
     .updateOne(

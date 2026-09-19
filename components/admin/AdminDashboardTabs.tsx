@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trophy, Link2, Users, Image as ImageIcon } from "lucide-react";
+import { Trophy, Link2, Users, Image as ImageIcon, Sparkles } from "lucide-react";
 import type { GamingContent } from "@/lib/gaming-content";
 import type { Leaderboard } from "@/lib/leaderboard-content";
 import type { SocialSettings } from "@/lib/settings";
@@ -9,8 +9,13 @@ import { GamingDashboard } from "@/components/admin/GamingDashboard";
 import { LeaderboardForm } from "@/components/admin/LeaderboardForm";
 import { RosterViewer } from "@/components/admin/RosterViewer";
 import { SocialSettingsForm } from "@/components/admin/SocialSettingsForm";
+import { EngagementDashboard } from "@/components/admin/EngagementDashboard";
+import { RewardsDashboard } from "@/components/admin/RewardsDashboard";
+import { EngagementSettingsForm } from "@/components/admin/EngagementSettingsForm";
+import { UserManagement } from "@/components/admin/UserManagement";
+import { RoleManagement } from "@/components/admin/RoleManagement";
 
-type Tab = "games" | "tournaments" | "social" | "roster" | "site";
+type Tab = "games" | "tournaments" | "social" | "roster" | "site" | "engagement" | "rewards" | "xp-settings" | "users";
 
 const TABS: { id: Tab; label: string; icon: typeof Trophy }[] = [
   { id: "games", label: "الألعاب", icon: ImageIcon },
@@ -18,6 +23,10 @@ const TABS: { id: Tab; label: string; icon: typeof Trophy }[] = [
   { id: "social", label: "روابط التواصل الاجتماعي", icon: Link2 },
   { id: "roster", label: "الترتيب العام", icon: Users },
   { id: "site", label: "إعدادات الموقع والصور", icon: ImageIcon },
+  { id: "engagement", label: "المهمات والمقاطع", icon: Sparkles },
+  { id: "rewards", label: "متجر XP", icon: Sparkles },
+  { id: "xp-settings", label: "قيم المهام", icon: Sparkles },
+  { id: "users", label: "المستخدمون والرتب", icon: Users },
 ];
 
 export function AdminDashboardTabs({ content, leaderboard, socialSettings }: { content: GamingContent; leaderboard: Leaderboard; socialSettings: SocialSettings }) {
@@ -44,6 +53,10 @@ export function AdminDashboardTabs({ content, leaderboard, socialSettings }: { c
         {active === "social" && <SocialSettingsForm initial={socialSettings} />}
         {active === "roster" && <LeaderboardForm initial={leaderboard} />}
         {active === "site" && <GamingDashboard initial={content} section="site" />}
+        {active === "engagement" && <EngagementDashboard />}
+        {active === "rewards" && <RewardsDashboard />}
+        {active === "xp-settings" && <EngagementSettingsForm />}
+        {active === "users" && <div className="admin-stack"><RoleManagement /><UserManagement /></div>}
       </main>
     </div>
   );

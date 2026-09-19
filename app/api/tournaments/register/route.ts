@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
+import { getUserProfile } from "@/lib/user-profile";
 import { buildSingleEliminationBracket } from "@/lib/tournament-bracket";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +27,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (!parsed.data.youtubeVerified) {
+    if (parsed.data.youtubeVerified !== true) {
       return NextResponse.json({ error: "يجب التحقق من اشتراك قناة Tiger Gaming قبل التسجيل." }, { status: 403 });
     }
     const db = await getDb();
+    const session = await getServerSession(authOptions).catch(() => null);
+    const profile = session?.user?.id ? await getUserProfile(session.user.id) : null;
     const tournament = await db.collection("gaming-content").findOne({ _id: "gaming-content" as any });
     const configuredTournament = (tournament as any)?.tournaments?.find(
       (item: { id: string }) => item.id === parsed.data.tournamentId
@@ -58,6 +61,12 @@ export async function POST(request: NextRequest) {
 
     await db.collection("tournament-registrations").insertOne({
       ...parsed.data,
+      playerName: profile?.username || parsed.data.playerName,
+      userId: session?.user?.id,
+      profileUsername: profile?.username,
+      profileAvatarUrl: profile?.avatarUrl,
+      profileFrame: profile?.frame,
+      profileFrameEnabled: profile?.frameEnabled,
       batch,
       slot,
       createdAt: new Date(),

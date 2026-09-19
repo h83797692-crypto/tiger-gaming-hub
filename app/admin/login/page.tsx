@@ -77,6 +77,15 @@ export default function AdminLoginPage() {
             {loading ? "Signing in..." : "Sign In"}
           </Button>
         </form>
+
+        <button
+          type="button"
+          onClick={() => void signIn("google", { callbackUrl: "/admin" })}
+          className="mt-4 w-full rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-tiger-orange hover:text-tiger-orange"
+        >
+          دخول الأدمن بجوجل
+        </button>
+
       </Card>
     </main>
   );

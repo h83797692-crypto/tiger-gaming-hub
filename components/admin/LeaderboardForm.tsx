@@ -16,7 +16,7 @@ function replaceAt<T>(list: T[], index: number, patch: (item: T) => T): T[] {
 }
 
 export function LeaderboardForm({ initial }: { initial: Leaderboard }) {
-  const [data, setData] = useState<Leaderboard>(initial);
+  const [data, setData] = useState<Leaderboard>({ ...initial, entries: [...initial.entries].sort((a, b) => b.points - a.points) });
   const [saving, setSaving] = useState(false);
 
   async function save() {

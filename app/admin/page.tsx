@@ -2,10 +2,15 @@ import { getGamingContent } from "@/lib/gaming-content";
 import { getLeaderboard } from "@/lib/leaderboard-content";
 import { getSocialSettings } from "@/lib/settings";
 import { AdminDashboardTabs } from "@/components/admin/AdminDashboardTabs";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") redirect(session?.user ? "/profile" : "/admin/login");
   const content = await getGamingContent();
   const leaderboard = await getLeaderboard();
   const socialSettings = await getSocialSettings();

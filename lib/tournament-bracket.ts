@@ -3,6 +3,14 @@ export type BracketMatch = {
   playerB: string;
   avatarA?: string;
   avatarB?: string;
+  userIdA?: string;
+  userIdB?: string;
+  frameA?: "champion" | null;
+  frameB?: "champion" | null;
+  frameEnabledA?: boolean;
+  frameEnabledB?: boolean;
+  xpA?: number;
+  xpB?: number;
   scoreA: number;
   scoreB: number;
   status: "upcoming" | "live" | "done";

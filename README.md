@@ -40,6 +40,43 @@ protocol-less pastes, and bare 11-character IDs, while ignoring extra query
 params. `?t=90` / `?t=1m30s` start offsets are carried into the embed.
 The admin pastes a URL; the ID is derived on save — no manual thumbnail entry.
 
+### Automatic YouTube feed
+`lib/youtube-feed.ts` loads the latest six videos on the server. The homepage
+uses YouTube Data API v3 when `YOUTUBE_API_KEY` is configured and falls back to
+YouTube's public RSS feed when only `YOUTUBE_CHANNEL_ID` is configured. Results
+are cached for five minutes and the existing manually managed videos remain a
+fallback if the feed is unavailable.
+
+Setup:
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/), create or
+   select a project, enable **YouTube Data API v3**, then open **APIs & Services
+   > Credentials > Create credentials > API key**.
+2. Restrict the key to **YouTube Data API v3** and keep it server-side. Do not
+   prefix it with `NEXT_PUBLIC_` and never commit `.env.local`.
+3. Find the channel ID in YouTube Studio under **Settings > Channel > Advanced
+   settings**, or open the channel's About page and use the channel URL/ID.
+4. Add these values to `.env.local`:
+
+   ```env
+   YOUTUBE_CHANNEL_ID=UCxxxxxxxxxxxxxxxxxxxxxx
+   YOUTUBE_API_KEY=AIza...
+   ```
+
+   The API key is optional. With only `YOUTUBE_CHANNEL_ID`, the app uses RSS;
+   Data API is preferred because it returns structured metadata and stable
+   thumbnails. Restart `npm run dev` after changing environment variables.
+
+### YouTube watch XP
+The embedded player uses the YouTube Iframe Player API in
+`components/gaming/YouTubeEmbed.tsx`. Authenticated users send short server
+heartbeats to `/api/youtube/watch`; the server credits only visible, playing,
+forward-contiguous time. Large seeks, hidden tabs, expired sessions, duplicate
+heartbeats, and concurrent watch sessions do not earn XP. The rate is controlled
+by the protected **قيم المهام** section in the admin dashboard as
+`watch_xp_per_minute`; the server distributes it proportionally across validated
+watched seconds and preserves fractional progress between heartbeats.
+
 ### Cloud media uploads
 `components/admin/ImageField.tsx` is a tab switch between **رفع ملف** and
 **لصق رابط**. File uploads are sent to Cloudinary through
@@ -79,10 +116,15 @@ under `app/api/`, and a server component page plus an admin form.
 
 ```bash
 npm install
-cp .env.example .env.local     # fill in MongoDB, NextAuth, and Cloudinary values
+cp .env.example .env.local     # fill in MongoDB, NextAuth, Google OAuth, and Cloudinary values
 npm run seed                   # creates the first admin user
 npm run dev                    # http://localhost:3001
 ```
+
+For public Google sign-in, add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to
+`.env.local` and register `http://localhost:3001/api/auth/callback/google` as an
+authorized redirect URI in Google Cloud Console. Production deployments must use
+the matching HTTPS callback URL and `NEXTAUTH_URL`.
 
 Build for production:
 

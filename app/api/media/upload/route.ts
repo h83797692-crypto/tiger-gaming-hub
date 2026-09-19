@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     const url = uploaded.secure_url;
 
     const db = await getDb();
-    await db.collection("media").insertOne({
+    const mediaResult = await db.collection("media").insertOne({
       url,
       publicId: uploaded.public_id,
       provider: "cloudinary",
@@ -95,10 +95,12 @@ export async function POST(req: NextRequest) {
       mimeType: file.type,
       sizeBytes: file.size,
       uploadedBy: session.user?.email,
+      uploadedByUserId: session.user?.id,
+      resourceType,
       createdAt: new Date(),
     });
 
-    return NextResponse.json({ url, publicId: uploaded.public_id, provider: "cloudinary" });
+    return NextResponse.json({ id: mediaResult.insertedId.toString(), url, publicId: uploaded.public_id, provider: "cloudinary", resourceType });
   } catch (error) {
     console.error("Cloudinary media upload failed", error);
     const message = error instanceof Error ? error.message : "Cloudinary upload failed";

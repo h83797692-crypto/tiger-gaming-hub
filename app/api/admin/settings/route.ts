@@ -20,12 +20,19 @@ const settingsSchema = z.object({
 });
 
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   return NextResponse.json(await getSocialSettings());
 }
 
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session?.user?.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const parsed = settingsSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

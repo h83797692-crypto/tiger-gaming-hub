@@ -7,7 +7,8 @@ export default async function middleware(request: NextRequest) {
   if (pathname === "/admin/login") return NextResponse.next();
 
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  const isAdmin = token?.role === "admin";
+  const hasAuthenticatedProvider = token?.provider === "google" || token?.provider === "credentials";
+  const isAdmin = token?.role === "admin" && hasAuthenticatedProvider;
 
   if (pathname.startsWith("/api/admin")) {
     if (isAdmin) return NextResponse.next();
@@ -21,8 +22,8 @@ export default async function middleware(request: NextRequest) {
     if (isAdmin) return NextResponse.next();
 
     const destination = request.nextUrl.clone();
-    destination.pathname = token ? "/" : "/admin/login";
-    destination.search = "";
+    destination.pathname = "/admin/login";
+    destination.search = token && !isAdmin ? "?error=admin_required" : "";
     return NextResponse.redirect(destination);
   }
 

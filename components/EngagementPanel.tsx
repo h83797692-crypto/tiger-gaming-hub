@@ -28,6 +28,13 @@ export function EngagementPanel({ compact = false }: { compact?: boolean }) {
     void load();
   }, [status]);
 
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const refreshAfterAward = () => { void load(); };
+    window.addEventListener("tiger:xp-awarded", refreshAfterAward);
+    return () => window.removeEventListener("tiger:xp-awarded", refreshAfterAward);
+  }, [status]);
+
   async function share() {
     if (navigator.share) await navigator.share({ title: "Tiger Gaming Hub", text: "تعال تابع المعركة معنا", url: window.location.href });
     else await navigator.clipboard.writeText(window.location.href);

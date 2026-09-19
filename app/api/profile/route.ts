@@ -42,6 +42,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const profile = await updateUserProfile(userId, parsed.data);
+    if (!profile) return NextResponse.json({ error: "لم يتم العثور على ملف المستخدم" }, { status: 404 });
     return NextResponse.json(profile);
   } catch (error) {
     console.error("Could not update user profile", error);

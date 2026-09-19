@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,11 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  async function startGoogleAdminLogin() {
+    await signOut({ redirect: false });
+    await signIn("google", { callbackUrl: "/admin" }, { prompt: "select_account", access_type: "offline" });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,7 +86,7 @@ export default function AdminLoginPage() {
 
         <button
           type="button"
-          onClick={() => void signIn("google", { callbackUrl: "/admin" })}
+          onClick={() => void startGoogleAdminLogin()}
           className="mt-4 w-full rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-tiger-orange hover:text-tiger-orange"
         >
           دخول الأدمن بجوجل

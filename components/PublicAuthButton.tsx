@@ -8,6 +8,10 @@ import { signIn, signOut, useSession } from "next-auth/react";
 export function PublicAuthButton() {
   const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
+  async function startGoogleLogin() {
+    if (session?.user) await signOut({ redirect: false });
+    await signIn("google", { callbackUrl: "/profile" }, { prompt: "select_account", access_type: "offline" });
+  }
   if (status === "loading") return null;
 
   if (session?.user) {
@@ -35,7 +39,7 @@ export function PublicAuthButton() {
       type="button"
       dir="rtl"
       className="group inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-bold text-white transition active:scale-[0.98] hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0D14]"
-      onClick={() => signIn("google", { callbackUrl: "/profile" })}
+      onClick={() => void startGoogleLogin()}
       aria-label="تسجيل الدخول بجوجل"
     >
       <span className="inline-grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-100 shadow-sm transition-transform duration-200 group-hover:scale-110" aria-hidden="true">

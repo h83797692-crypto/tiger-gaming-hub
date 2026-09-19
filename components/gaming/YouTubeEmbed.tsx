@@ -69,6 +69,9 @@ export function YouTubeEmbed({
         const response = await fetch("/api/youtube/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, videoId, sessionId: watchSessionRef.current ?? undefined, currentTime, playing: player.getPlayerState() === 1, visible }) });
         const payload = await response.json().catch(() => ({}));
         if (payload.sessionId) watchSessionRef.current = payload.sessionId;
+        if (action === "heartbeat" && Number(payload.addedXp ?? 0) > 0) {
+          window.dispatchEvent(new CustomEvent("tiger:xp-awarded", { detail: { amount: Number(payload.addedXp) } }));
+        }
         if (action === "heartbeat" && (response.status === 409 || payload.alreadyClaimed === true)) {
           watchBlockedRef.current = true;
           if (timer) window.clearInterval(timer);

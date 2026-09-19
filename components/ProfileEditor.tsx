@@ -56,15 +56,26 @@ export function ProfileEditor() {
     setError(null);
     setMessage(null);
     try {
+      const nextUsername = username.trim();
+      if (!profile || nextUsername.length < 2) {
+        throw new Error("أدخل لقبًا صالحًا قبل الحفظ");
+      }
       const response = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, avatarUrl, frameEnabled }),
+        body: JSON.stringify({ username: nextUsername, avatarUrl, frameEnabled }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "تعذر حفظ الملف الشخصي");
-      setProfile(payload);
-      await update({ name: payload.username, image: payload.avatarUrl });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        const errorPayload = payload as { error?: string } | null;
+        throw new Error(errorPayload?.error ?? "تعذر حفظ الملف الشخصي");
+      }
+      if (!payload || typeof payload !== "object" || typeof (payload as { username?: unknown }).username !== "string") {
+        throw new Error("تعذر تأكيد حفظ الملف الشخصي");
+      }
+      const savedProfile = payload as UserProfile;
+      setProfile(savedProfile);
+      await update({ name: savedProfile.username, image: savedProfile.avatarUrl });
       setMessage("تم حفظ ملفك الشخصي بنجاح.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "تعذر حفظ الملف الشخصي");

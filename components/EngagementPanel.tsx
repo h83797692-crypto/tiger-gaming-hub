@@ -38,7 +38,14 @@ export function EngagementPanel({ compact = false }: { compact?: boolean }) {
   async function share() {
     if (navigator.share) await navigator.share({ title: "Tiger Gaming Hub", text: "تعال تابع المعركة معنا", url: window.location.href });
     else await navigator.clipboard.writeText(window.location.href);
-    setMessage("تم نسخ الرابط. مكافأة المشاركة تحتاج حدثًا موثقًا.");
+    const response = await fetch("/api/engagement", { method: "POST" });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      setMessage(payload?.error ?? "تعذر تسجيل المشاركة.");
+      return;
+    }
+    await load();
+    setMessage(payload?.alreadyClaimed ? "تم تسجيل المشاركة مسبقًا اليوم." : "تمت المشاركة وإضافة نقاط XP.");
   }
 
   if (status === "loading") return null;

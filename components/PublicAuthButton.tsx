@@ -9,8 +9,7 @@ export function PublicAuthButton() {
   const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
   async function startGoogleLogin() {
-    if (session?.user) await signOut({ redirect: false });
-    await signIn("google", { callbackUrl: `${window.location.origin}/profile` }, { prompt: "select_account", access_type: "offline" });
+    await signIn("google", { callbackUrl: "/profile" }, { prompt: "select_account", access_type: "offline" });
   }
   if (status === "loading") return null;
 

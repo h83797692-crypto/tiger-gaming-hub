@@ -103,6 +103,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = (user as any).role ?? (account?.provider === "google" ? "member" : "admin");
         token.userId = user.id;
+        token.provider = account?.provider === "google" ? "google" : "credentials";
       }
       return token;
     },
@@ -110,6 +111,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).role = token.role === "admin" || roleFor(session.user.email) === "admin" ? "admin" : "member";
         (session.user as any).id = token.userId ?? token.sub;
+        (session.user as any).provider = token.provider;
 
         if (token.userId && (session.user as any).role !== "admin") {
           const profile = await getUserProfile(String(token.userId));

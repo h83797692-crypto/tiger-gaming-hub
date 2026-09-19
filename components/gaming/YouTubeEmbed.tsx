@@ -35,7 +35,7 @@ export function YouTubeEmbed({
   title: string;
 }) {
   const videoId = getYoutubeId(youtubeUrl);
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const hostRef = useRef<HTMLIFrameElement>(null);
   const playerRef = useRef<YoutubePlayer | null>(null);
   const readyRef = useRef(false);
@@ -53,19 +53,31 @@ export function YouTubeEmbed({
     if (!videoId || !origin || !hostRef.current) return;
     let active = true;
     let timer: number | undefined;
+    const heartbeatInFlightRef = { current: false };
+    const watchBlockedRef = { current: false };
     const send = async (action: "start" | "heartbeat" | "stop", player: YoutubePlayer) => {
       const visible = document.visibilityState === "visible";
       const currentTime = Math.max(0, player.getCurrentTime());
-      if (status !== "authenticated") return;
+      if (status !== "authenticated" || session?.user?.provider !== "google") return;
+      if (action === "heartbeat" && (watchBlockedRef.current || heartbeatInFlightRef.current)) return;
       if (action !== "start" && !watchSessionRef.current) {
         if (sessionStartingRef.current) await sessionStartingRef.current;
         if (!watchSessionRef.current) return;
       }
-      const response = await fetch("/api/youtube/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, videoId, sessionId: watchSessionRef.current ?? undefined, currentTime, playing: player.getPlayerState() === 1, visible }) });
-      const payload = await response.json().catch(() => ({}));
-      if (payload.sessionId) watchSessionRef.current = payload.sessionId;
-      if (!response.ok && action !== "stop") setNotice(payload.error ?? "تم إيقاف احتساب المشاهدة");
-      return response.ok;
+      if (action === "heartbeat") heartbeatInFlightRef.current = true;
+      try {
+        const response = await fetch("/api/youtube/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, videoId, sessionId: watchSessionRef.current ?? undefined, currentTime, playing: player.getPlayerState() === 1, visible }) });
+        const payload = await response.json().catch(() => ({}));
+        if (payload.sessionId) watchSessionRef.current = payload.sessionId;
+        if (action === "heartbeat" && (response.status === 409 || payload.alreadyClaimed === true)) {
+          watchBlockedRef.current = true;
+          if (timer) window.clearInterval(timer);
+        }
+        if (!response.ok && action !== "stop") setNotice(payload.error ?? "تم إيقاف احتساب المشاهدة");
+        return response.ok;
+      } finally {
+        if (action === "heartbeat") heartbeatInFlightRef.current = false;
+      }
     };
     void loadYoutubeApi().then((YT) => {
       if (!active || !hostRef.current) return;
@@ -101,7 +113,7 @@ export function YouTubeEmbed({
     const visibility = () => { if (readyRef.current && playerRef.current && watchSessionRef.current) void send("heartbeat", playerRef.current); };
     document.addEventListener("visibilitychange", visibility);
     return () => { active = false; document.removeEventListener("visibilitychange", visibility); if (timer) window.clearInterval(timer); if (readyRef.current && playerRef.current) void send("stop", playerRef.current); readyRef.current = false; playerRef.current?.destroy(); playerRef.current = null; };
-  }, [videoId, status, origin]);
+  }, [videoId, session?.user?.provider, status, origin]);
 
   if (videoId && origin) {
     const embedParams = new URLSearchParams({

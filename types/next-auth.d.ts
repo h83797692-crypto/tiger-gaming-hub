@@ -13,6 +13,7 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       role?: "admin" | "member";
+      provider?: "google" | "credentials";
       profile?: {
         id: string;
         email: string;
@@ -30,5 +31,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     role?: "admin" | "member";
     userId?: string;
+    provider?: "google" | "credentials";
   }
 }

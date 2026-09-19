@@ -24,6 +24,9 @@ const SESSION_TTL_MS = 45 * 60 * 1000;
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions).catch(() => null);
   if (!session?.user?.id) return NextResponse.json({ error: "يجب تسجيل الدخول لجمع XP" }, { status: 401 });
+  if ((session.user as { provider?: string }).provider !== "google") {
+    return NextResponse.json({ error: "يجب استخدام حساب Google لجمع XP" }, { status: 403 });
+  }
 
   const parsed = payloadSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "بيانات المشاهدة غير صالحة" }, { status: 400 });

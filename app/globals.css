@@ -34,6 +34,12 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  max-inline-size: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   color: #fff;
@@ -1307,6 +1313,12 @@ body {
 .admin-roster__table th { color: var(--cyan); font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase; }
 
 @media (max-width: 560px) {
+  .game-grid,
+  .tournament-grid,
+  .video-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .hero-game-tabs {
     display: grid;
     grid-template-columns: 1fr;

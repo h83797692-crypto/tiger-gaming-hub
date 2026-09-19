@@ -101,15 +101,15 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user, account }) {
       if (user) {
-        token.role = (user as any).role ?? (account?.provider === "google" ? "member" : "admin");
+        token.role = (user as any).role === "admin" ? "admin" : "member";
         token.userId = user.id;
-        token.provider = account?.provider === "google" ? "google" : "credentials";
+        token.provider = account?.provider === "google" ? "google" : account?.provider === "credentials" ? "credentials" : undefined;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).role = token.role === "admin" || roleFor(session.user.email) === "admin" ? "admin" : "member";
+        (session.user as any).role = token.role === "admin" ? "admin" : "member";
         (session.user as any).id = token.userId ?? token.sub;
         (session.user as any).provider = token.provider;
 

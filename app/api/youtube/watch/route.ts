@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
   const credit = input.playing && input.visible ? Math.floor(Math.min(Math.max(positionDelta, 0), elapsed + 1)) : 0;
   if (credit <= 0) {
     await db.collection("youtube-watch-sessions").updateOne({ _id: watch._id }, { $set: { lastCurrentTime: input.currentTime, lastHeartbeatAt: now } });
-    return NextResponse.json({ creditedSeconds: Number(watch.creditedSeconds ?? 0), addedXp: 0 });
+    const settings = await getEngagementSettings();
+    return NextResponse.json({ creditedSeconds: Number(watch.creditedSeconds ?? 0), addedXp: 0, earnedXp: Number(watch.creditedSeconds ?? 0) * settings.watch_xp_per_minute / 60 });
   }
 
   const settings = await getEngagementSettings();
@@ -94,5 +95,5 @@ export async function POST(request: NextRequest) {
   if (!updated) return NextResponse.json({ error: "تم رفض heartbeat مكرر" }, { status: 409 });
 
   if (addedXp > 0) await awardXp(session.user.id, addedXp);
-  return NextResponse.json({ creditedSeconds: Number(updated.creditedSeconds ?? 0), addedXp });
+  return NextResponse.json({ creditedSeconds: Number(updated.creditedSeconds ?? 0), addedXp, earnedXp: Number(updated.creditedSeconds ?? 0) * settings.watch_xp_per_minute / 60 });
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getYoutubeId } from "@/lib/youtube";
 import { useSession } from "next-auth/react";
+import { AnimatedXP } from "@/components/gaming/AnimatedXP";
 
 type YoutubePlayer = { getCurrentTime: () => number; getPlayerState: () => number; destroy: () => void };
 type YoutubeNamespace = { Player: new (element: HTMLElement, options: { videoId: string; playerVars: Record<string, string | number>; events: { onReady: () => void; onStateChange: (event: { data: number }) => void; onError: (event: { data: number }) => void } }) => YoutubePlayer };
@@ -44,6 +45,8 @@ export function YouTubeEmbed({
   const lastHeartbeatRef = useRef(0);
   const [notice, setNotice] = useState("");
   const [origin, setOrigin] = useState("");
+  const [watchXp, setWatchXp] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -53,6 +56,8 @@ export function YouTubeEmbed({
     if (!videoId || !origin || !hostRef.current) return;
     let active = true;
     let timer: number | undefined;
+    setWatchXp(0);
+    setIsPlaying(false);
     const heartbeatInFlightRef = { current: false };
     const watchBlockedRef = { current: false };
     const send = async (action: "start" | "heartbeat" | "stop", player: YoutubePlayer) => {
@@ -69,6 +74,9 @@ export function YouTubeEmbed({
         const response = await fetch("/api/youtube/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, videoId, sessionId: watchSessionRef.current ?? undefined, currentTime, playing: player.getPlayerState() === 1, visible }) });
         const payload = await response.json().catch(() => ({}));
         if (payload.sessionId) watchSessionRef.current = payload.sessionId;
+        if (active && action === "heartbeat" && Number.isFinite(Number(payload.earnedXp))) {
+          setWatchXp(Math.max(0, Number(payload.earnedXp)));
+        }
         if (action === "heartbeat" && Number(payload.addedXp ?? 0) > 0) {
           window.dispatchEvent(new CustomEvent("tiger:xp-awarded", { detail: { amount: Number(payload.addedXp) } }));
         }
@@ -100,7 +108,7 @@ export function YouTubeEmbed({
             playerRef.current = player;
             sessionStartingRef.current = send("start", player).finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
           },
-          onStateChange: () => {},
+          onStateChange: (event) => { setIsPlaying(event.data === 1); },
           onError: (event) => {
             readyRef.current = false;
             const message = event.data === 101 || event.data === 150
@@ -138,6 +146,7 @@ export function YouTubeEmbed({
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
         />
+        {status === "authenticated" && session?.user?.provider === "google" && (isPlaying || watchXp > 0) && <AnimatedXP value={watchXp} className="youtube-watch-notice" />}
         {notice && <small className="youtube-watch-notice">{notice}</small>}
       </div>
     );

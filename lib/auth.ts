@@ -9,7 +9,7 @@ import { getUserProfile, upsertGoogleUser } from "@/lib/user-profile";
 
 const googleProvider = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
   ? GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
+  clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
@@ -83,7 +83,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === "google" && profile && ((profile as { email_verified?: boolean }).email_verified !== true || !profile.email)) {
+      if (account?.provider === "google" && (!profile || (profile as { email_verified?: boolean }).email_verified !== true || !profile.email)) {
         return false;
       }
 

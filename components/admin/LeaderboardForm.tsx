@@ -19,6 +19,21 @@ export function LeaderboardForm({ initial }: { initial: Leaderboard }) {
   const [data, setData] = useState<Leaderboard>({ ...initial, entries: [...initial.entries].sort((a, b) => b.points - a.points) });
   const [saving, setSaving] = useState(false);
 
+  function addTier() {
+    setData((current) => {
+      const previous = current.tiers[current.tiers.length - 1];
+      return {
+        ...current,
+        tiers: [...current.tiers, {
+          tier: current.tiers.length + 1,
+          label: `Tier ${current.tiers.length + 1}`,
+          threshold: (previous?.threshold ?? 0) + 500,
+          iconUrl: "",
+        }],
+      };
+    });
+  }
+
   async function save() {
     setSaving(true);
     try {
@@ -29,7 +44,8 @@ export function LeaderboardForm({ initial }: { initial: Leaderboard }) {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.error ?? "تعذر حفظ السلم");
-      if (payload.id) setData(payload);
+      if (!payload.id || !Array.isArray(payload.tiers)) throw new Error("استجابة الحفظ غير صالحة");
+      setData({ ...payload, entries: [...payload.entries].sort((a: { points: number }, b: { points: number }) => b.points - a.points) });
       toast.success("تم تحديث Battle Pass");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر الحفظ");
@@ -109,18 +125,8 @@ export function LeaderboardForm({ initial }: { initial: Leaderboard }) {
           <Button
             variant="outline"
             disabled={data.tiers.length >= MAX_LADDER_LEVELS}
-            onClick={() => {
-              const previous = data.tiers[data.tiers.length - 1];
-              setData({
-                ...data,
-                tiers: [...data.tiers, {
-                  tier: data.tiers.length + 1,
-                  label: `Tier ${data.tiers.length + 1}`,
-                  threshold: (previous?.threshold ?? 0) + 500,
-                  iconUrl: "",
-                }],
-              });
-            }}
+            type="button"
+            onClick={addTier}
           >
             + رتبة
           </Button>

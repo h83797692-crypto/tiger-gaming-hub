@@ -1,6 +1,5 @@
 import { getGamingContent } from "@/lib/gaming-content";
 import { getLeaderboard } from "@/lib/leaderboard-content";
-import { DonationButton } from "@/components/DonationButton";
 import { TournamentArena } from "@/components/gaming/TournamentArena";
 import { BattlePassLadder } from "@/components/gaming/BattlePassLadder";
 import { ContentCard, CardImage } from "@/components/gaming/ContentCard";
@@ -25,7 +24,6 @@ export default async function HomePage() {
 
   return (
     <main>
-      <DonationButton />
       <HeroSection title={content.heroTitle} subtitle={content.heroSubtitle} cta={content.heroCta} announcement={content.announcement} games={content.games} />
 
       <EngagementPanel />

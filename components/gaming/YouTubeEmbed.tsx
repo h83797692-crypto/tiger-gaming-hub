@@ -36,7 +36,7 @@ export function YouTubeEmbed({
   title: string;
 }) {
   const videoId = getYoutubeId(youtubeUrl);
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const hostRef = useRef<HTMLIFrameElement>(null);
   const playerRef = useRef<YoutubePlayer | null>(null);
   const readyRef = useRef(false);
@@ -106,7 +106,11 @@ export function YouTubeEmbed({
           onReady: () => {
             readyRef.current = true;
             playerRef.current = player;
-            sessionStartingRef.current = send("start", player).finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
+            sessionStartingRef.current = (async () => {
+              const refreshedSession = await update();
+              if (refreshedSession?.user?.provider !== "google") return false;
+              return send("start", player);
+            })().finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
           },
           onStateChange: (event) => { setIsPlaying(event.data === 1); },
           onError: (event) => {

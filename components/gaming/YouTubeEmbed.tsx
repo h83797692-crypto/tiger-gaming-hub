@@ -96,19 +96,36 @@ export function YouTubeEmbed({
       try {
         const response = await fetch("/api/youtube/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, videoId, sessionId: watchSessionRef.current ?? undefined, currentTime, playing: player.getPlayerState() === 1, visible }) });
         const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          console.error("[YouTube XP] Watch API request failed", {
+            action,
+            status: response.status,
+            error: payload.error,
+          });
+          if (action !== "stop") setNotice(payload.error ?? "تعذر احتساب XP للمشاهدة");
+          return false;
+        }
         if (payload.sessionId) watchSessionRef.current = payload.sessionId;
         if (active && action === "heartbeat" && Number.isFinite(Number(payload.earnedXp))) {
           setWatchXp(Math.max(0, Number(payload.earnedXp)));
         }
-        if (action === "heartbeat" && Number(payload.addedXp ?? 0) > 0) {
-          window.dispatchEvent(new CustomEvent("tiger:xp-awarded", { detail: { amount: Number(payload.addedXp) } }));
+        if (action === "heartbeat") {
+          window.dispatchEvent(new CustomEvent("tiger:xp-awarded", {
+            detail: {
+              amount: Number(payload.addedXp ?? 0),
+              earnedXp: Number(payload.earnedXp ?? 0),
+            },
+          }));
         }
         if (action === "heartbeat" && (response.status === 409 || payload.alreadyClaimed === true)) {
           watchBlockedRef.current = true;
           if (timer) window.clearInterval(timer);
         }
-        if (!response.ok && action !== "stop") setNotice(payload.error ?? "تم إيقاف احتساب المشاهدة");
         return response.ok;
+      } catch (error) {
+        console.error("[YouTube XP] Watch API connection failed", { action, error });
+        if (action !== "stop") setNotice("تعذر الاتصال بخدمة احتساب XP");
+        return false;
       } finally {
         if (action === "heartbeat") heartbeatInFlightRef.current = false;
       }

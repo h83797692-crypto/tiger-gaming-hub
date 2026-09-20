@@ -28,6 +28,10 @@ export interface Leaderboard {
 export const LADDER_LEVELS = 5;
 export const MAX_LADDER_LEVELS = 20;
 
+function byPointsDescending(a: LeaderboardEntry, b: LeaderboardEntry) {
+  return Number(b.points) - Number(a.points);
+}
+
 export const DEFAULT_LEADERBOARD: Leaderboard = {
   id: "community-pass",
   title: "Community Battle Pass",
@@ -69,7 +73,7 @@ export async function getLeaderboard(): Promise<Leaderboard> {
     const merged = { ...DEFAULT_LEADERBOARD, ...rest } as Leaderboard;
     const entries = merged.entries ?? [];
     const userIds = entries.map((entry) => entry.userId).filter((userId): userId is string => Boolean(userId));
-    if (userIds.length === 0) return { ...merged, tiers: normaliseTiers(merged.tiers), entries: [...entries].sort((a, b) => b.points - a.points) };
+    if (userIds.length === 0) return { ...merged, tiers: normaliseTiers(merged.tiers), entries: [...entries].sort(byPointsDescending) };
 
     const profiles = await db.collection("users").find({ userId: { $in: userIds } }).toArray();
     const profileById = new Map(profiles.map((profile) => [String(profile.userId), profile]));
@@ -79,7 +83,7 @@ export async function getLeaderboard(): Promise<Leaderboard> {
       entries: entries.map((entry) => {
         const profile = entry.userId ? profileById.get(entry.userId) : undefined;
         return profile ? { ...entry, name: profile.username, avatarUrl: profile.avatarUrl, frame: profile.frame, frameEnabled: profile.frameEnabled } : entry;
-      }).sort((a, b) => b.points - a.points),
+      }).sort(byPointsDescending),
     };
   } catch (error) {
     console.error("MongoDB unavailable; serving default leaderboard.", error);
@@ -89,7 +93,7 @@ export async function getLeaderboard(): Promise<Leaderboard> {
 
 export async function updateLeaderboard(content: Leaderboard) {
   const db = await getDb();
-  const payload = { ...content, tiers: normaliseTiers(content.tiers), entries: [...content.entries].sort((a, b) => b.points - a.points) };
+  const payload = { ...content, tiers: normaliseTiers(content.tiers), entries: [...content.entries].sort(byPointsDescending) };
   await db
     .collection("leaderboards")
     .updateOne(

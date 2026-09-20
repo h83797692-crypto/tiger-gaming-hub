@@ -28,7 +28,7 @@ export function BattlePassLadder({ leaderboard }: { leaderboard: Leaderboard }) 
   const tiers = normaliseTiers(leaderboard.tiers);
   const maxThreshold = Math.max(...tiers.map((tier) => tier.threshold), 1);
 
-  const entries = [...(leaderboard.entries ?? [])].sort((a, b) => b.points - a.points);
+  const entries = [...(leaderboard.entries ?? [])].sort((a, b) => Number(b.points) - Number(a.points));
   const leader = entries[0];
   const leaderPoints = leader?.points ?? 0;
   const leaderTier = leader ? tierForPoints(leaderPoints, tiers) : tiers[0];

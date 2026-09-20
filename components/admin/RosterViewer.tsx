@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Game, Tournament } from "@/lib/gaming-content";
 import { advanceBracketWinner, buildSingleEliminationBracket, type BracketRound } from "@/lib/tournament-bracket";
+import { PubgScrimDashboard } from "@/components/admin/PubgScrimDashboard";
+import { isPubgTournament } from "@/lib/pubg-scrims";
 
 type Registration = {
   id: string;
@@ -126,7 +128,10 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
   const [createError, setCreateError] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newGame, setNewGame] = useState(games[0]?.title ?? "");
+  const [newMode, setNewMode] = useState<Tournament["mode"]>("solo");
   const [newSize, setNewSize] = useState("4");
+  const [newRegistrationType, setNewRegistrationType] = useState<"custom" | "random">("random");
+  const [newCustomTeams, setNewCustomTeams] = useState("");
 
   const gameTournaments = useMemo(
     () => tournamentList.filter((item) => item.game === selectedGame),
@@ -211,9 +216,14 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
   };
 
   const createTournament = async () => {
-    const maxPlayers = Number(newSize);
+    const customTeams = Array.from(new Set(newCustomTeams.split(/[\n,]+/).map((team) => team.trim()).filter(Boolean)));
+    const maxPlayers = newRegistrationType === "custom" ? customTeams.length : Number(newSize);
     if (!newGame || !newTitle.trim() || !Number.isInteger(maxPlayers) || maxPlayers < 1) {
       setCreateError("اختر اللعبة واكتب اسم البطولة واختر سعة صحيحة.");
+      return;
+    }
+    if (isPubgTournament(newGame) && newRegistrationType === "custom" && customTeams.length < 1) {
+      setCreateError("أدخل اسم فريق PUBG واحداً على الأقل.");
       return;
     }
 
@@ -223,7 +233,7 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
       const response = await fetch("/api/tournaments/bracket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game: newGame, title: newTitle.trim(), maxPlayers }),
+        body: JSON.stringify({ game: newGame, title: newTitle.trim(), mode: newMode, maxPlayers, registrationType: newRegistrationType, customTeams }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.tournament) throw new Error(payload.error ?? "تعذر إنشاء البطولة");
@@ -376,9 +386,12 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="admin-field">اسم البطولة<input className="admin-input" value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder="مثال: Generals Open" /></label>
-              <label className="admin-field">اللعبة<select className="admin-select" value={newGame} onChange={(event) => setNewGame(event.target.value)}>{games.map((game) => <option key={game.id} value={game.title}>{game.title}</option>)}</select></label>
-              <label className="admin-field">عدد اللاعبين / السعة<select className="admin-select" value={newSize} onChange={(event) => setNewSize(event.target.value)}>{[4, 8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}</select></label>
+              <label className="admin-field">اللعبة<select className="admin-select" value={newGame} onChange={(event) => { setNewGame(event.target.value); if (!isPubgTournament(event.target.value)) setNewRegistrationType("random"); }}>{games.map((game) => <option key={game.id} value={game.title}>{game.title}</option>)}</select></label>
+              <label className="admin-field">الوضع<select className="admin-select" value={newMode} onChange={(event) => setNewMode(event.target.value as Tournament["mode"])}><option value="solo">Solo</option><option value="duo">Duo</option><option value="squad">Squad</option></select></label>
+              <label className="admin-field">طبيعة التسجيل<select className="admin-select" value={newRegistrationType} onChange={(event) => setNewRegistrationType(event.target.value as "custom" | "random")}><option value="random">عشوائية</option>{isPubgTournament(newGame) && <option value="custom">فرق مخصصة</option>}</select></label>
+              {newRegistrationType === "random" && <label className="admin-field">عدد اللاعبين / السعة<select className="admin-select" value={newSize} onChange={(event) => setNewSize(event.target.value)}>{[4, 8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}</select></label>}
             </div>
+            {newRegistrationType === "custom" && isPubgTournament(newGame) && <label className="admin-field mt-4">أسماء فرق PUBG المخصصة<textarea className="admin-input min-h-32" value={newCustomTeams} onChange={(event) => setNewCustomTeams(event.target.value)} placeholder="اكتب فريقاً في كل سطر" /></label>}
               <p className="mt-4 rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3 text-sm text-cyan-100">سيتم إدخال المشاركين تلقائياً من نموذج التسجيل في الموقع عند اكتمال السعة.</p>
             {createError && <p className="mt-3 text-sm text-red-300">{createError}</p>}
             <div className="mt-5 flex justify-end gap-2">
@@ -391,6 +404,8 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
 
       {loading ? (
         <p className="admin-empty">جارٍ تحميل السجل...</p>
+      ) : tournament && isPubgTournament(tournament.game) ? (
+        <PubgScrimDashboard tournament={tournament} />
       ) : (
         <div className="space-y-6">
           {visible.length > 0 ? <div className="admin-roster__table-wrap">

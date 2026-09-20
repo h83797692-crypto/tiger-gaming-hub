@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
 import { grantChampionFrame } from "@/lib/user-profile";
 import type { BracketRound } from "@/lib/tournament-bracket";
+import { buildPubgResults, isPubgTournament, type PubgTeamResult } from "@/lib/pubg-scrims";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,10 @@ const bracketPayloadSchema = z.object({
 const createTournamentSchema = z.object({
   game: z.string().trim().min(1).max(120),
   title: z.string().trim().min(1).max(160),
-  maxPlayers: z.union([z.literal(4), z.literal(8), z.literal(16), z.literal(32), z.literal(64)]),
+  mode: z.enum(["solo", "duo", "squad"]).default("solo"),
+  maxPlayers: z.number().int().min(1).max(100),
+  registrationType: z.enum(["custom", "random"]).default("random"),
+  customTeams: z.array(z.string().trim().min(1).max(80)).max(100).default([]),
 });
 
 async function hydrateRounds(rounds: BracketRound[], registrations: Array<Record<string, unknown>>) {
@@ -97,6 +101,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "بيانات البطولة غير صحيحة", details: parsed.error.flatten() }, { status: 400 });
   }
 
+  if (isPubgTournament(parsed.data.game) && parsed.data.registrationType === "custom" && parsed.data.customTeams.length === 0) {
+    return NextResponse.json({ error: "أدخل أسماء فرق PUBG المخصصة قبل إنشاء البطولة" }, { status: 400 });
+  }
+  if (!isPubgTournament(parsed.data.game) && parsed.data.registrationType === "custom") {
+    return NextResponse.json({ error: "التسجيل المخصص متاح لبطولات PUBG فقط" }, { status: 400 });
+  }
+
   try {
     const db = await getDb();
     const tournamentId = `${parsed.data.game.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tournament"}-${Date.now()}`;
@@ -105,12 +116,16 @@ export async function POST(request: NextRequest) {
       id: tournamentId,
       title: parsed.data.title,
       game: parsed.data.game,
-      mode: "solo" as const,
+      mode: parsed.data.mode,
       status: "open" as const,
       date: new Date().toISOString().slice(0, 10),
       prize: "",
       maxPlayers: parsed.data.maxPlayers,
-      rules: "Single elimination · 1v1",
+      registrationType: isPubgTournament(parsed.data.game) ? parsed.data.registrationType : "random",
+      customTeams: isPubgTournament(parsed.data.game) && parsed.data.registrationType === "custom"
+        ? Array.from(new Set(parsed.data.customTeams.map((team) => team.trim()).filter(Boolean)))
+        : [],
+      rules: isPubgTournament(parsed.data.game) ? "PUBG Custom Room · Placement + Kills" : "Single elimination · 1v1",
       rounds,
     };
 
@@ -154,6 +169,9 @@ export async function GET(request: NextRequest) {
       rounds: hydratedRounds,
       maxPlayers: doc?.maxPlayers,
       registrations: registrations.map(({ _id, ...registration }) => ({ ...registration, id: _id.toString() })),
+      pubgResults: isPubgTournament(String((await db.collection("gaming").findOne({ _id: "gaming-content" as any }))?.tournaments?.find((item: { id: string }) => item.id === tournamentId)?.game ?? ""))
+        ? buildPubgResults(registrations as Array<Record<string, unknown>>, (doc?.pubgResults ?? []) as Array<Partial<PubgTeamResult>>)
+        : undefined,
     });
   } catch (error) {
     console.error("Could not load tournament bracket", error);
@@ -208,6 +226,31 @@ export async function PUT(request: NextRequest) {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON request body" }, { status: 400 });
+  }
+
+  const pubgPayload = z.object({
+    tournamentId: z.string().min(1),
+    pubgResults: z.array(z.object({ teamId: z.string().min(1), placement: z.number().int().min(0).max(100), kills: z.number().int().min(0).max(999) })).max(100),
+  }).safeParse(body);
+  if (pubgPayload.success) {
+    try {
+      const db = await getDb();
+      const tournamentDoc = await db.collection("gaming").findOne({ _id: "gaming-content" as any });
+      const configuredTournament = (tournamentDoc as any)?.tournaments?.find((item: { id: string }) => item.id === pubgPayload.data.tournamentId);
+      if (configuredTournament && isPubgTournament(configuredTournament.game)) {
+        const registrations = await db.collection("tournament-registrations").find({ tournamentId: pubgPayload.data.tournamentId }).toArray();
+        const results = buildPubgResults(registrations as Array<Record<string, unknown>>, pubgPayload.data.pubgResults);
+        await db.collection("tournament-brackets").updateOne(
+          { tournamentId: pubgPayload.data.tournamentId },
+          { $set: { tournamentId: pubgPayload.data.tournamentId, pubgResults: results, updatedAt: new Date() } },
+          { upsert: true }
+        );
+        return NextResponse.json({ success: true, pubgResults: results });
+      }
+    } catch (error) {
+      console.error("Could not save PUBG results", error);
+      return NextResponse.json({ error: "تعذر حفظ نتائج PUBG" }, { status: 503 });
+    }
   }
 
   const parsed = bracketPayloadSchema.safeParse(body);

@@ -60,6 +60,8 @@ export interface Tournament {
   date: string;
   prize: string;
   maxPlayers: number;
+  registrationType?: "custom" | "random";
+  customTeams?: string[];
   rules: string;
   rounds: Round[];
 }

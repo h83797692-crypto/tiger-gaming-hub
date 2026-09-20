@@ -44,9 +44,15 @@ const GENERALS_FACTIONS: { value: Faction; label: string; detail: string }[] = [
   { value: "random", label: "Random", detail: "اختيار عشوائي" },
 ];
 
+type CustomTeamOption = { name: string; occupied: boolean; canCancel?: boolean };
+
 export function RegistrationModal({ tournament, games, onClose }: { tournament: Tournament; games: Game[]; onClose: () => void }) {
   const [playerName, setPlayerName] = useState("");
   const [inGameId, setInGameId] = useState("");
+  const [teamName, setTeamName] = useState("");
+  const [customTeamName, setCustomTeamName] = useState("");
+  const [customTeams, setCustomTeams] = useState<CustomTeamOption[]>([]);
+  const [teamMembers, setTeamMembers] = useState(["", "", ""]);
   const [youtubeHandle, setYoutubeHandle] = useState("");
   const [youtubeVerified, setYoutubeVerified] = useState(false);
   const [mode, setMode] = useState<Mode>(tournament.mode ?? "solo");
@@ -74,6 +80,10 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
         setReserved(payload.count);
         setBatch(payload.batch);
         setMaxPlayers(payload.maxPlayers);
+        setCustomTeams(Array.isArray(payload.customTeams) ? payload.customTeams : []);
+        if (Array.isArray(payload.customTeams)) {
+          setCustomTeamName(payload.customTeams.find((team: CustomTeamOption) => !team.occupied)?.name ?? "");
+        }
       })
       .catch(() => undefined);
   }, [tournament.id]);
@@ -82,6 +92,8 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
   const selectedGame = games.find((item) => item.title === game);
   const isGenerals = selectedGame?.id === "generals-zero-hour";
   const isJawaker = selectedGame?.id === "jawaker";
+  const isPubg = selectedGame?.id === "pubg";
+  const isCustomPubg = isPubg && tournament.registrationType === "custom";
   const availableModes = isJawaker ? JAWAKER_MODES : isGenerals ? GENERALS_MODES : MODES;
   const getAccent = (item: Game) => item.accentColor || CATEGORY_ACCENTS[item.category] || CATEGORY_ACCENTS.default;
 
@@ -103,17 +115,40 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
       const response = await fetch("/api/tournaments/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tournamentId: tournament.id, playerName, inGameId, mode, faction: isGenerals ? faction : undefined, game, gameId: selectedGame?.id, youtubeHandle, youtubeVerified }),
+        body: JSON.stringify({ tournamentId: tournament.id, playerName, inGameId, mode, customTeamName: isCustomPubg ? customTeamName : undefined, teamName: isPubg && mode === "squad" && !isCustomPubg ? teamName : undefined, teamMembers: isPubg && mode === "squad" ? teamMembers : undefined, faction: isGenerals ? faction : undefined, game, gameId: selectedGame?.id, youtubeHandle, youtubeVerified }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "تعذر التسجيل");
-      setReserved(payload.slot === payload.maxPlayers ? 0 : payload.slot);
+      setReserved(payload.count ?? payload.slot);
       setBatch(payload.slot === payload.maxPlayers ? payload.batch + 1 : payload.batch);
+      if (isCustomPubg) {
+        setCustomTeams((current) => current.map((team) => team.name === customTeamName ? { ...team, occupied: true, canCancel: true } : team));
+      }
       setStatus({ kind: "success", text: `تم الحجز في المقعد ${payload.slot} من الدفعة ${payload.batch}. ${payload.message}` });
       setPlayerName("");
       setInGameId("");
     } catch (error) {
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "تعذر التسجيل" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function cancelBooking() {
+    const team = customTeams.find((item) => item.name === customTeamName);
+    if (!team?.canCancel) return;
+    setSaving(true);
+    setStatus(null);
+    try {
+      const teamId = `${tournament.id}:${encodeURIComponent(customTeamName.toLowerCase())}`;
+      const response = await fetch(`/api/tournaments/register?tournamentId=${encodeURIComponent(tournament.id)}&teamId=${encodeURIComponent(teamId)}`, { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "تعذر إلغاء الحجز");
+      setCustomTeams((current) => current.map((item) => item.name === customTeamName ? { ...item, occupied: false, canCancel: false } : item));
+      setReserved((current) => Math.max(0, current - 1));
+      setStatus({ kind: "success", text: "تم إلغاء حجز التيم وإتاحته للتسجيل من جديد." });
+    } catch (error) {
+      setStatus({ kind: "error", text: error instanceof Error ? error.message : "تعذر إلغاء الحجز" });
     } finally {
       setSaving(false);
     }
@@ -146,6 +181,19 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
 
         <form onSubmit={submit} className="registration-form flex flex-col gap-4 p-6 text-start">
           <div className="registration-field flex flex-col gap-2">
+            {isCustomPubg && <>
+              <label htmlFor="custom-team-name">الفريق المخصص</label>
+              <select id="custom-team-name" required disabled={!youtubeVerified || isFull} value={customTeamName} onChange={(event) => setCustomTeamName(event.target.value)}>
+                <option value="">اختر فريقك</option>
+                {customTeams.map((team) => <option key={team.name} value={team.name} disabled={team.occupied}>{team.name}{team.occupied ? " (محجوز)" : ""}</option>)}
+              </select>
+              {customTeams.find((team) => team.name === customTeamName)?.canCancel && <button type="button" className="gaming-button" onClick={() => void cancelBooking()} disabled={saving}>تراجع عن التسجيل</button>}
+            </>}
+            {isPubg && mode === "squad" && !isCustomPubg && <>
+              <label htmlFor="team-name">اسم الفريق</label>
+              <input id="team-name" required disabled={!youtubeVerified} value={teamName} onChange={(event) => setTeamName(event.target.value)} placeholder="Tiger Squad" />
+              {teamMembers.map((member, index) => <input key={index} required disabled={!youtubeVerified} value={member} onChange={(event) => setTeamMembers((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`اسم العضو ${index + 2}`} aria-label={`اسم العضو ${index + 2}`} />)}
+            </>}
             <label htmlFor="player-name">اسم اللاعب</label>
             <input id="player-name" required disabled={!youtubeVerified} minLength={2} maxLength={80} value={playerName} onChange={(event) => setPlayerName(event.target.value)} placeholder="Tiger Player" />
           </div>

@@ -37,6 +37,8 @@ export function YouTubeEmbed({
 }) {
   const videoId = getYoutubeId(youtubeUrl);
   const { data: session, status, update } = useSession();
+  const authRef = useRef({ provider: session?.user?.provider, status });
+  const updateRef = useRef(update);
   const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YoutubePlayer | null>(null);
@@ -50,6 +52,9 @@ export function YouTubeEmbed({
   const [isActivated, setIsActivated] = useState(false);
   const [watchXp, setWatchXp] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  authRef.current = { provider: session?.user?.provider, status };
+  updateRef.current = update;
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -81,7 +86,7 @@ export function YouTubeEmbed({
     const send = async (action: "start" | "heartbeat" | "stop", player: YoutubePlayer) => {
       const visible = document.visibilityState === "visible";
       const currentTime = Math.max(0, player.getCurrentTime());
-      if (status !== "authenticated" || session?.user?.provider !== "google") return;
+      if (authRef.current.status !== "authenticated" || authRef.current.provider !== "google") return;
       if (action === "heartbeat" && (watchBlockedRef.current || heartbeatInFlightRef.current)) return;
       if (action !== "start" && !watchSessionRef.current) {
         if (sessionStartingRef.current) await sessionStartingRef.current;
@@ -118,14 +123,13 @@ export function YouTubeEmbed({
           playsinline: 1,
           enablejsapi: 1,
           origin,
-          widget_referrer: window.location.href,
         },
         events: {
           onReady: () => {
             readyRef.current = true;
             playerRef.current = player;
             sessionStartingRef.current = (async () => {
-              const refreshedSession = await update();
+              const refreshedSession = await updateRef.current();
               if (refreshedSession?.user?.provider !== "google") return false;
               return send("start", player);
             })().finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
@@ -146,7 +150,7 @@ export function YouTubeEmbed({
     const visibility = () => { if (readyRef.current && playerRef.current && watchSessionRef.current) void send("heartbeat", playerRef.current); };
     document.addEventListener("visibilitychange", visibility);
     return () => { active = false; document.removeEventListener("visibilitychange", visibility); if (timer) window.clearInterval(timer); if (readyRef.current && playerRef.current) void send("stop", playerRef.current); readyRef.current = false; playerRef.current?.destroy(); playerRef.current = null; };
-  }, [videoId, session?.user?.provider, status, origin, shouldLoad, isActivated, update]);
+  }, [videoId, origin, shouldLoad, isActivated]);
 
   function activatePlayer() {
     setIsActivated(true);

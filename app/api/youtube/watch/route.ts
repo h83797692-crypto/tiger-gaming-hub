@@ -37,6 +37,21 @@ export async function POST(request: NextRequest) {
 
   if (input.action === "start") {
     console.info("[YouTube XP] Watch session started", { videoId: input.videoId, provider: session.user.provider });
+    const activeSession = await db.collection("youtube-watch-sessions").findOne({
+      userId: session.user.id,
+      videoId: input.videoId,
+      invalid: false,
+      stoppedAt: { $exists: false },
+      expiresAt: { $gt: now },
+    });
+    if (activeSession) {
+      await db.collection("youtube-watch-sessions").updateOne(
+        { _id: activeSession._id },
+        { $set: { lastHeartbeatAt: now, expiresAt: new Date(now.getTime() + SESSION_TTL_MS) } }
+      );
+      console.info("[YouTube XP] Reusing active watch session", { videoId: input.videoId });
+      return NextResponse.json({ sessionId: activeSession.sessionId, creditedSeconds: Number(activeSession.creditedSeconds ?? 0) });
+    }
     const sessionId = randomUUID();
     await db.collection("youtube-watch-sessions").updateMany(
       { userId: session.user.id, invalid: false, stoppedAt: { $exists: false } },
@@ -60,6 +75,7 @@ export async function POST(request: NextRequest) {
   if (!input.sessionId) return NextResponse.json({ error: "جلسة المشاهدة مفقودة" }, { status: 400 });
   const watch = await db.collection("youtube-watch-sessions").findOne({ sessionId: input.sessionId, userId: session.user.id, videoId: input.videoId });
   if (!watch || watch.invalid || !(watch.expiresAt instanceof Date) || watch.expiresAt <= now) {
+    console.warn("[YouTube XP] Heartbeat rejected: invalid or expired session", { action: input.action, videoId: input.videoId });
     return NextResponse.json({ error: "جلسة المشاهدة غير صالحة" }, { status: 409 });
   }
 
@@ -70,9 +86,13 @@ export async function POST(request: NextRequest) {
 
   const elapsed = Math.max(0, Math.min(HEARTBEAT_LIMIT_SECONDS, (now.getTime() - new Date(watch.lastHeartbeatAt).getTime()) / 1000));
   const positionDelta = input.currentTime - Number(watch.lastCurrentTime ?? 0);
-  const isSuspiciousSeek = positionDelta > elapsed + 2 || positionDelta < -2;
+  const isInitialHeartbeat = Number(watch.creditedSeconds ?? 0) === 0 && Number(watch.lastCurrentTime ?? 0) === 0;
+  const isSuspiciousSeek = isInitialHeartbeat
+    ? positionDelta > HEARTBEAT_LIMIT_SECONDS + 2 || positionDelta < -2
+    : positionDelta > elapsed + 2 || positionDelta < -2;
   if (isSuspiciousSeek) {
     await db.collection("youtube-watch-sessions").updateOne({ _id: watch._id }, { $set: { invalid: true, invalidReason: "seek", lastHeartbeatAt: now } });
+    console.warn("[YouTube XP] Heartbeat rejected: suspicious seek", { videoId: input.videoId, elapsed, positionDelta });
     return NextResponse.json({ error: "تم إيقاف مكافأة المشاهدة بسبب التخطي" }, { status: 409 });
   }
 
@@ -93,7 +113,10 @@ export async function POST(request: NextRequest) {
     { $inc: { creditedSeconds: credit }, $set: { lastCurrentTime: input.currentTime, lastHeartbeatAt: now, xpRemainder: nextRemainder } },
     { returnDocument: "after" }
   );
-  if (!updated) return NextResponse.json({ error: "تم رفض heartbeat مكرر" }, { status: 409 });
+  if (!updated) {
+    console.warn("[YouTube XP] Heartbeat rejected: concurrent duplicate", { videoId: input.videoId });
+    return NextResponse.json({ error: "تم رفض heartbeat مكرر" }, { status: 409 });
+  }
 
   if (addedXp > 0) {
     await awardXp(session.user.id, addedXp);

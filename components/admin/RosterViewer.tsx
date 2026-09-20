@@ -122,6 +122,7 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
   const [bracketSize, setBracketSize] = useState(4);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [creatingTournament, setCreatingTournament] = useState(false);
+  const [deletingTournament, setDeletingTournament] = useState(false);
   const [createError, setCreateError] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newGame, setNewGame] = useState(games[0]?.title ?? "");
@@ -242,6 +243,30 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
     }
   };
 
+  const deleteTournament = async () => {
+    if (!selectedTournament || !window.confirm("هل تريد حذف البطولة وجميع تسجيلاتها؟")) return;
+
+    setDeletingTournament(true);
+    try {
+      const response = await fetch(`/api/tournaments/bracket?tournamentId=${encodeURIComponent(selectedTournament)}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error ?? "تعذر حذف البطولة");
+
+      const remaining = tournamentList.filter((item) => item.id !== selectedTournament);
+      setTournamentList(remaining);
+      setSelectedTournament(remaining.find((item) => item.game === selectedGame)?.id ?? "");
+      setRegistrations((current) => current.filter((item) => item.tournamentId !== selectedTournament));
+      setBracketRounds([]);
+      setCreateError("");
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "تعذر حذف البطولة");
+    } finally {
+      setDeletingTournament(false);
+    }
+  };
+
   const updateWinner = (roundIndex: number, matchIndex: number, winner: string) => {
     setBracketRounds((current) => advanceBracketWinner(current, roundIndex, matchIndex, winner));
   };
@@ -328,6 +353,9 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
         <button type="button" className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" onClick={startTournament} disabled={savingBracket || visible.length === 0}>
           بدء البطولة من المسجلين
         </button>
+        <button type="button" className="rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white/80" onClick={deleteTournament} disabled={deletingTournament || !selectedTournament}>
+          {deletingTournament ? "جارٍ الحذف..." : "حذف البطولة"}
+        </button>
         <button type="button" className="rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white/80" onClick={() => setBracketRounds(buildSingleEliminationBracket([]))}>
           إعادة تعيين
         </button>
@@ -349,7 +377,7 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="admin-field">اسم البطولة<input className="admin-input" value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder="مثال: Generals Open" /></label>
               <label className="admin-field">اللعبة<select className="admin-select" value={newGame} onChange={(event) => setNewGame(event.target.value)}>{games.map((game) => <option key={game.id} value={game.title}>{game.title}</option>)}</select></label>
-              <label className="admin-field">عدد اللاعبين / السعة<select className="admin-select" value={newSize} onChange={(event) => setNewSize(event.target.value)}>{[8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}</select></label>
+              <label className="admin-field">عدد اللاعبين / السعة<select className="admin-select" value={newSize} onChange={(event) => setNewSize(event.target.value)}>{[4, 8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}</select></label>
             </div>
               <p className="mt-4 rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3 text-sm text-cyan-100">سيتم إدخال المشاركين تلقائياً من نموذج التسجيل في الموقع عند اكتمال السعة.</p>
             {createError && <p className="mt-3 text-sm text-red-300">{createError}</p>}

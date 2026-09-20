@@ -161,6 +161,35 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions).catch(() => null);
+  if (session?.user?.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const tournamentId = request.nextUrl.searchParams.get("tournamentId");
+  if (!tournamentId) {
+    return NextResponse.json({ error: "Tournament ID is required" }, { status: 400 });
+  }
+
+  try {
+    const db = await getDb();
+    await Promise.all([
+      db.collection("tournament-brackets").deleteOne({ tournamentId }),
+      db.collection("tournament-registrations").deleteMany({ tournamentId }),
+      db.collection("gaming").updateOne(
+        { _id: "gaming-content" as any },
+        { $pull: { tournaments: { id: tournamentId } } as any, $set: { updatedAt: new Date() } }
+      ),
+    ]);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Could not delete tournament", error);
+    return NextResponse.json({ error: "تعذر حذف البطولة" }, { status: 503 });
+  }
+}
+
 export async function PUT(request: NextRequest) {
   let session;
   try {

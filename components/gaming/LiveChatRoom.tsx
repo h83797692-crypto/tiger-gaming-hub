@@ -39,8 +39,19 @@ export function LiveChatRoom({ roomId }: { roomId: string }) {
   const [replyTo, setReplyTo] = useState<ChatMessage["replyTo"]>(null);
   const [chatUsers, setChatUsers] = useState<ChatUser[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
+  const roomRef = useRef<HTMLElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    const element = roomRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(([entry]) => setIsVisible(Boolean(entry?.isIntersecting)), { rootMargin: "240px 0px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
     const source = new EventSource(`/api/chat?roomId=${encodeURIComponent(roomId)}`);
     const handleMessages = (event: MessageEvent<string>) => {
       try {
@@ -53,17 +64,17 @@ export function LiveChatRoom({ roomId }: { roomId: string }) {
     source.addEventListener("chat", handleMessages);
     source.addEventListener("error", () => setError("الاتصال بالشات غير مستقر، جارٍ إعادة المحاولة..."));
     return () => source.close();
-  }, [roomId]);
+  }, [isVisible, roomId]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (!isVisible || status !== "authenticated") return;
     const heartbeat = () => void fetch("/api/chat/presence", { method: "POST" });
     const loadUsers = () => void fetch("/api/chat/users", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((payload) => setChatUsers(payload?.users ?? []));
     heartbeat();
     loadUsers();
     const timer = window.setInterval(() => { heartbeat(); loadUsers(); }, 30_000);
     return () => window.clearInterval(timer);
-  }, [status]);
+  }, [isVisible, status]);
 
   useEffect(() => {
     const list = listRef.current;
@@ -101,7 +112,7 @@ export function LiveChatRoom({ roomId }: { roomId: string }) {
   }
 
   return (
-    <section className="live-chat" dir="rtl" aria-label="غرفة الشات المباشر">
+    <section ref={roomRef} className="live-chat" dir="rtl" aria-label="غرفة الشات المباشر">
       <header className="live-chat__header">
         <div>
           <p className="eyebrow">LIVE ROOM / CHAT</p>

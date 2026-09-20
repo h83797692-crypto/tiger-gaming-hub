@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Game, Match, Round, Tournament } from "@/lib/gaming-content";
 import { RegistrationModal } from "@/components/gaming/RegistrationModal";
 import { TournamentBracket } from "@/components/gaming/TournamentBracket";
@@ -119,8 +119,19 @@ export function VersusScreen({ tournament, games }: { tournament: Tournament; ga
   const [registeredCount, setRegisteredCount] = useState(0);
   const [pubgResults, setPubgResults] = useState<PubgTeamResult[]>([]);
   const [isRegistrationOpen, setRegistrationOpen] = useState(false);
+  const screenRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    const element = screenRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(([entry]) => setIsVisible(Boolean(entry?.isIntersecting)), { rootMargin: "240px 0px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
     let active = true;
     const loadBracket = async () => {
       const response = await fetch(`/api/tournaments/bracket?tournamentId=${encodeURIComponent(tournament.id)}`, { cache: "no-store" });
@@ -151,12 +162,12 @@ export function VersusScreen({ tournament, games }: { tournament: Tournament; ga
       active = false;
       window.clearInterval(interval);
     };
-  }, [tournament.id, tournament.maxPlayers, tournament.rounds]);
+  }, [isVisible, tournament.id, tournament.maxPlayers, tournament.rounds]);
 
   const displayRounds = liveRounds;
 
   return (
-    <div className="versus-screen">
+    <div ref={screenRef} className="versus-screen">
       <button type="button" className="tournament-join-button" onClick={() => setRegistrationOpen(true)}>
         انضمام للبطولة <span aria-hidden="true">↗</span>
       </button>

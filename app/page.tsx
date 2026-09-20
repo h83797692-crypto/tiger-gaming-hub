@@ -1,12 +1,11 @@
 import { getGamingContent } from "@/lib/gaming-content";
 import { getLeaderboard } from "@/lib/leaderboard-content";
 import { DonationButton } from "@/components/DonationButton";
-import { VersusScreen } from "@/components/gaming/VersusScreen";
+import { TournamentArena } from "@/components/gaming/TournamentArena";
 import { BattlePassLadder } from "@/components/gaming/BattlePassLadder";
 import { ContentCard, CardImage } from "@/components/gaming/ContentCard";
 import { YoutubeVideoGrid } from "@/components/gaming/YoutubeVideoGrid";
 import { HeroSection } from "@/components/gaming/HeroSection";
-import { LiveChatRoom } from "@/components/gaming/LiveChatRoom";
 import { EngagementPanel } from "@/components/EngagementPanel";
 import { ClipHall } from "@/components/ClipHall";
 import { getLatestYoutubeVideos } from "@/lib/youtube-feed";
@@ -15,12 +14,6 @@ import { getLatestYoutubeVideos } from "@/lib/youtube-feed";
 // load, not stuck behind a stale cache.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const STATUS_LABEL: Record<string, string> = {
-  open: "التسجيل مفتوح",
-  live: "مباشرة",
-  completed: "مكتملة",
-};
 
 export default async function HomePage() {
   const content = await getGamingContent();
@@ -67,36 +60,7 @@ export default async function HomePage() {
         </div>
 
         <div className="tournament-grid">
-          {content.tournaments.map((tournament) => (
-            <article className="hud-panel tournament-card" key={tournament.id}>
-              <div className="tournament-meta">
-                <span className={`status status--${tournament.status}`}>
-                  {STATUS_LABEL[tournament.status] ?? tournament.status}
-                </span>
-                <span>{tournament.game}</span>
-              </div>
-
-              <h3>{tournament.title}</h3>
-              <p>{tournament.rules}</p>
-
-              <div className="tournament-stats">
-                <span>
-                  الجائزة <b>{tournament.prize}</b>
-                </span>
-                <span>
-                  المقاعد <b>{tournament.maxPlayers}</b>
-                </span>
-                <span>
-                  التاريخ <b>{tournament.date}</b>
-                </span>
-              </div>
-
-              <div className="live-arena-layout">
-                <VersusScreen tournament={tournament} games={content.games} />
-                <LiveChatRoom roomId={tournament.id} />
-              </div>
-            </article>
-          ))}
+          <TournamentArena tournaments={content.tournaments} games={content.games} />
         </div>
       </section>
 

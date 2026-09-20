@@ -53,7 +53,7 @@ export function HeroSection({ title, subtitle, cta, announcement, games }: { tit
             >
               <span className="hero-game-tab__icon">
                 {game.iconUrl || game.imageUrl ? (
-                  <img src={game.iconUrl || game.imageUrl} alt={game.title} />
+                  <img src={game.iconUrl || game.imageUrl} alt={game.title} loading="lazy" />
                 ) : (
                   <span className="hero-game-tab__glyph">{game.title.slice(0, 2).toUpperCase()}</span>
                 )}

@@ -291,9 +291,11 @@ body {
 
 .game-grid,
 .tournament-grid,
-.video-grid {
+.video-grid,
+.clip-grid {
   display: grid;
   gap: 1rem;
+  content-visibility: auto;
 }
 .game-grid {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1313,7 +1315,7 @@ body {
 .donation-floating-button { pointer-events: auto; }
 .donation-floating-button .donation-trigger { min-block-size: 3.2rem; border-color: rgba(255, 215, 0, 0.6); background: rgba(7, 9, 14, 0.9); color: #ffd700; box-shadow: 0 0 25px rgba(255, 215, 0, 0.4); animation: donation-pulse 2.4s ease-in-out infinite; }
 .donation-floating-button .donation-trigger:hover { transform: scale(1.1); box-shadow: 0 0 35px rgba(255, 215, 0, 0.7); }
-.sidebar-hud { position: fixed; inset-inline-start: 0; inset-block-start: 50%; z-index: 50; width: 13rem; transform: translateY(-50%); }
+.sidebar-hud { position: fixed; left: 0; right: auto; inset-block-start: 50%; z-index: 50; width: 13rem; transform: translateY(-50%); }
 .sidebar-hud__pulse { position: absolute; inset: -0.35rem; border: 1px solid rgba(0,240,255,.25); border-radius: 1rem; box-shadow: 0 0 25px rgba(0,240,255,.4); pointer-events: none; }
 .sidebar-hud__content { position: relative; display: flex; flex-direction: column; gap: .7rem; border: 1px solid rgba(0,240,255,.6); border-radius: 1rem; background: rgba(7,9,14,.9); padding: .75rem; backdrop-filter: blur(14px); }
 .sidebar-hud__label { color: var(--cyan); font-family: var(--font-gaming); font-size: .62rem; font-weight: 900; letter-spacing: .16em; text-align: center; }
@@ -1411,7 +1413,7 @@ body {
     padding-inline: 0.7rem;
     font-size: 0.68rem;
   }
-  .sidebar-hud { inset-inline-start: 0; width: min(11rem, 100vw); }
+  .sidebar-hud { left: 0; right: auto; width: min(11rem, 100vw); }
   .admin-tabs-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-tab { justify-content: flex-start; text-align: start; }
   .social-links-grid { grid-template-columns: 1fr; }

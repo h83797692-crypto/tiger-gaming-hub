@@ -61,7 +61,7 @@ export function BattlePassLadder({ leaderboard }: { leaderboard: Leaderboard }) 
                 <span className="tier-icon">
                   {tier.iconUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={tier.iconUrl} alt="" />
+                    <img src={tier.iconUrl} alt="" loading="lazy" />
                   ) : (
                     <span>{tier.tier}</span>
                   )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Tournament } from "@/lib/gaming-content";
-import { getPubgPoints } from "@/lib/pubg-scrims";
+import { getPubgPoints, sortPubgResults } from "@/lib/pubg-scrims";
 
 type PubgResult = {
   teamId: string;
@@ -51,7 +51,7 @@ export function PubgScrimDashboard({ tournament }: { tournament: Tournament }) {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "تعذر حفظ نتائج PUBG");
-      setResults(payload.pubgResults ?? results);
+      setResults(sortPubgResults(payload.pubgResults ?? results));
       setMessage("تم حفظ النتائج وحساب نقاط الروم بنجاح.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "تعذر حفظ نتائج PUBG");

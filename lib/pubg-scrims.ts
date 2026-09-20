@@ -8,7 +8,7 @@ export type PubgTeamResult = {
   points: number;
 };
 
-const PLACEMENT_POINTS = [10, 6, 5, 4, 3, 2, 1, 1, 1, 1];
+const PLACEMENT_POINTS = [15, 12, 10, 8, 6, 4, 2, 1, 1];
 
 export function isPubgTournament(game: string) {
   return /pubg/i.test(game);
@@ -20,6 +20,10 @@ export function getPlacementPoints(placement: number) {
 
 export function getPubgPoints(placement: number, kills: number) {
   return getPlacementPoints(placement) + Math.max(0, kills);
+}
+
+export function sortPubgResults(results: PubgTeamResult[]) {
+  return [...results].sort((a, b) => b.points - a.points || a.placement - b.placement || a.teamName.localeCompare(b.teamName));
 }
 
 export function buildPubgResults(
@@ -40,11 +44,11 @@ export function buildPubgResults(
     teams.set(teamId, current);
   });
 
-  return Array.from(teams.values()).map((team, index) => {
+  return sortPubgResults(Array.from(teams.values()).map((team, index) => {
     const previous = saved.find((result) => result.teamId === team.teamId);
     const placement = Number(previous?.placement ?? 0) || 0;
     const kills = Math.max(0, Number(previous?.kills ?? 0) || 0);
     const placementPoints = getPlacementPoints(placement);
     return { ...team, placement, kills, placementPoints, points: getPubgPoints(placement, kills) };
-  }).sort((a, b) => b.points - a.points || a.placement - b.placement || a.teamName.localeCompare(b.teamName));
+  }));
 }

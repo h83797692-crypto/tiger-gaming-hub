@@ -6,6 +6,8 @@ import { RegistrationModal } from "@/components/gaming/RegistrationModal";
 import { TournamentBracket } from "@/components/gaming/TournamentBracket";
 import { buildSingleEliminationBracket } from "@/lib/tournament-bracket";
 import { UserAvatar } from "@/components/UserAvatar";
+import type { PubgTeamResult } from "@/lib/pubg-scrims";
+import { isPubgTournament } from "@/lib/pubg-scrims";
 
 const ROUND_FALLBACKS = ["Round 1", "Quarters", "Semis", "Final"];
 
@@ -115,6 +117,7 @@ function MatchCard({ match }: { match: Match }) {
 export function VersusScreen({ tournament, games }: { tournament: Tournament; games: Game[] }) {
   const [liveRounds, setLiveRounds] = useState<Round[]>(tournament.rounds ?? []);
   const [registeredCount, setRegisteredCount] = useState(0);
+  const [pubgResults, setPubgResults] = useState<PubgTeamResult[]>([]);
   const [isRegistrationOpen, setRegistrationOpen] = useState(false);
 
   useEffect(() => {
@@ -126,7 +129,11 @@ export function VersusScreen({ tournament, games }: { tournament: Tournament; ga
       if (!active) return;
       const registrations = Array.isArray(payload.registrations) ? payload.registrations : [];
       setRegisteredCount(registrations.length);
-      if (Array.isArray(payload.rounds) && payload.rounds.length > 0) {
+      const isCustomPubg = isPubgTournament(tournament.game) && tournament.registrationType === "custom";
+      setPubgResults(isCustomPubg && Array.isArray(payload.pubgResults) ? payload.pubgResults : []);
+      if (isCustomPubg) {
+        setLiveRounds([]);
+      } else if (Array.isArray(payload.rounds) && payload.rounds.length > 0) {
         setLiveRounds(payload.rounds);
       } else if (registrations.length > 0) {
         setLiveRounds(buildSingleEliminationBracket(
@@ -156,7 +163,16 @@ export function VersusScreen({ tournament, games }: { tournament: Tournament; ga
 
       <p className="mt-2 text-xs text-white/55">المسجلون: {registeredCount}/{tournament.maxPlayers}</p>
 
-      <TournamentBracket rounds={displayRounds} />
+      {isPubgTournament(tournament.game) && tournament.registrationType === "custom" ? (
+        <ol className="tournament-stats" aria-label="ترتيب فرق PUBG حسب النقاط">
+          {pubgResults.map((team, index) => (
+            <li key={team.teamId}>
+              <span>#{index + 1} {team.teamName}</span>
+              <b>{team.points} نقطة</b>
+            </li>
+          ))}
+        </ol>
+      ) : <TournamentBracket rounds={displayRounds} />}
 
       {isRegistrationOpen && (
         <RegistrationModal tournament={tournament} games={games} onClose={() => setRegistrationOpen(false)} />

@@ -73,14 +73,33 @@ export async function POST(request: NextRequest) {
   }
 
   if (!input.sessionId) return NextResponse.json({ error: "جلسة المشاهدة مفقودة" }, { status: 400 });
-  const watch = await db.collection("youtube-watch-sessions").findOne({ sessionId: input.sessionId, userId: session.user.id, videoId: input.videoId });
+  const watch = await db.collection("youtube-watch-sessions").findOne({
+    sessionId: input.sessionId,
+    userId: session.user.id,
+    videoId: input.videoId,
+    stoppedAt: { $exists: false },
+  });
   if (!watch || watch.invalid || !(watch.expiresAt instanceof Date) || watch.expiresAt <= now) {
     console.warn("[YouTube XP] Heartbeat rejected: invalid or expired session", { action: input.action, videoId: input.videoId });
     return NextResponse.json({ error: "جلسة المشاهدة غير صالحة" }, { status: 409 });
   }
 
   if (input.action === "stop") {
-    await db.collection("youtube-watch-sessions").updateOne({ _id: watch._id }, { $set: { stoppedAt: now, lastHeartbeatAt: now } });
+    const stopped = await db.collection("youtube-watch-sessions").updateOne(
+      {
+        _id: watch._id,
+        sessionId: input.sessionId,
+        userId: session.user.id,
+        videoId: input.videoId,
+        invalid: false,
+        stoppedAt: { $exists: false },
+        expiresAt: { $gt: now },
+      },
+      { $set: { stoppedAt: now, lastHeartbeatAt: now } }
+    );
+    if (stopped.matchedCount === 0) {
+      return NextResponse.json({ error: "جلسة المشاهدة تغيرت بالتزامن" }, { status: 409 });
+    }
     return NextResponse.json({ creditedSeconds: Number(watch.creditedSeconds ?? 0) });
   }
 
@@ -98,9 +117,27 @@ export async function POST(request: NextRequest) {
 
   const credit = input.playing && input.visible ? Math.floor(Math.min(Math.max(positionDelta, 0), elapsed + 1)) : 0;
   if (credit <= 0) {
-    await db.collection("youtube-watch-sessions").updateOne({ _id: watch._id }, { $set: { lastCurrentTime: input.currentTime, lastHeartbeatAt: now } });
+    const updated = await db.collection("youtube-watch-sessions").findOneAndUpdate(
+      {
+        _id: watch._id,
+        sessionId: input.sessionId,
+        userId: session.user.id,
+        videoId: input.videoId,
+        invalid: false,
+        stoppedAt: { $exists: false },
+        expiresAt: { $gt: now },
+        lastCurrentTime: watch.lastCurrentTime,
+        lastHeartbeatAt: watch.lastHeartbeatAt,
+      },
+      { $set: { lastCurrentTime: input.currentTime, lastHeartbeatAt: now } },
+      { returnDocument: "after" }
+    );
+    if (!updated) {
+      console.warn("[YouTube XP] Zero-credit heartbeat rejected: concurrent duplicate", { videoId: input.videoId });
+      return NextResponse.json({ error: "تم رفض heartbeat مكرر" }, { status: 409 });
+    }
     const settings = await getEngagementSettings();
-    return NextResponse.json({ creditedSeconds: Number(watch.creditedSeconds ?? 0), addedXp: 0, earnedXp: Number(watch.creditedSeconds ?? 0) * settings.watch_xp_per_minute / 60 });
+    return NextResponse.json({ creditedSeconds: Number(updated.creditedSeconds ?? 0), addedXp: 0, earnedXp: Number(updated.creditedSeconds ?? 0) * settings.watch_xp_per_minute / 60 });
   }
 
   const settings = await getEngagementSettings();
@@ -109,7 +146,17 @@ export async function POST(request: NextRequest) {
   const addedXp = Math.floor(availableXp);
   const nextRemainder = availableXp - addedXp;
   const updated = await db.collection("youtube-watch-sessions").findOneAndUpdate(
-    { _id: watch._id, invalid: false, lastCurrentTime: watch.lastCurrentTime, lastHeartbeatAt: watch.lastHeartbeatAt },
+    {
+      _id: watch._id,
+      sessionId: input.sessionId,
+      userId: session.user.id,
+      videoId: input.videoId,
+      invalid: false,
+      stoppedAt: { $exists: false },
+      expiresAt: { $gt: now },
+      lastCurrentTime: watch.lastCurrentTime,
+      lastHeartbeatAt: watch.lastHeartbeatAt,
+    },
     { $inc: { creditedSeconds: credit }, $set: { lastCurrentTime: input.currentTime, lastHeartbeatAt: now, xpRemainder: nextRemainder } },
     { returnDocument: "after" }
   );

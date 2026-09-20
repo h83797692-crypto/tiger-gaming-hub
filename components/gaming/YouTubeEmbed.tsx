@@ -113,6 +113,14 @@ export function YouTubeEmbed({
         if (action === "heartbeat") heartbeatInFlightRef.current = false;
       }
     };
+    const startWatchSession = (player: YoutubePlayer) => {
+      if (watchSessionRef.current || sessionStartingRef.current) return;
+      sessionStartingRef.current = (async () => {
+        const refreshedSession = await updateRef.current();
+        if (refreshedSession?.user?.provider !== "google") return false;
+        return send("start", player);
+      })().finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
+    };
     void loadYoutubeApi().then((YT) => {
       if (!active || !hostRef.current) return;
       const player = new YT.Player(hostRef.current, {
@@ -128,13 +136,12 @@ export function YouTubeEmbed({
           onReady: () => {
             readyRef.current = true;
             playerRef.current = player;
-            sessionStartingRef.current = (async () => {
-              const refreshedSession = await updateRef.current();
-              if (refreshedSession?.user?.provider !== "google") return false;
-              return send("start", player);
-            })().finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
+            startWatchSession(player);
           },
-          onStateChange: (event) => { setIsPlaying(event.data === 1); },
+          onStateChange: (event) => {
+            setIsPlaying(event.data === 1);
+            if (event.data === 1) startWatchSession(player);
+          },
           onError: (event) => {
             readyRef.current = false;
             const message = event.data === 101 || event.data === 150

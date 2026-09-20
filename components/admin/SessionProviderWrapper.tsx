@@ -1,7 +1,8 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
+import type { Session } from "next-auth";
 
-export function SessionProviderWrapper({ children }: { children: React.ReactNode }) {
-  return <SessionProvider refetchOnWindowFocus refetchWhenOffline={false}>{children}</SessionProvider>;
+export function SessionProviderWrapper({ children, session }: { children: React.ReactNode; session?: Session | null }) {
+  return <SessionProvider session={session} refetchOnWindowFocus refetchWhenOffline={false}>{children}</SessionProvider>;
 }

@@ -8,6 +8,8 @@ import { Footer } from "@/components/Footer";
 import { Toaster } from "sonner";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { SessionProviderWrapper } from "@/components/admin/SessionProviderWrapper";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"], variable: "--font-cairo", display: "swap" });
 const chakra = Chakra_Petch({ subsets: ["latin"], variable: "--font-chakra", display: "swap", weight: ["500", "600", "700"] });
@@ -29,6 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const content = await getGamingContent();
   const siteContent = await getSiteContent();
+  const session = await getServerSession(authOptions);
 
   // Arabic locale: dir="rtl" is set at the root, and every component below is
   // built on logical CSS properties so the whole HUD mirrors, not just text.
@@ -36,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="ar" dir="rtl" className={`dark ${cairo.variable} ${chakra.variable}`}>
       <body className="min-h-screen font-sans antialiased">
         <AnimatedBackground />
-        <SessionProviderWrapper>
+        <SessionProviderWrapper session={session}>
           <Header siteName={content.brand} socialLinks={siteContent.socialLinks} />
           {children}
           <Footer siteName={content.brand} slogan={content.heroSubtitle} socialLinks={siteContent.socialLinks} />

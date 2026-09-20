@@ -37,6 +37,7 @@ export const authOptions: NextAuthOptions & { trustHost?: boolean } = {
         sameSite: "lax",
         path: "/",
         secure: useSecureCookies,
+        maxAge: 60 * 60 * 8,
       },
     },
   },

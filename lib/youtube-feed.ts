@@ -109,18 +109,25 @@ async function fetchFromApi(channelId: string, apiKey: string, limit: number) {
 }
 
 async function fetchFromRss(channelId: string, limit: number) {
-  const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`, { next: { revalidate: 300 }, headers: { Accept: "application/atom+xml" } });
+  const reference = normaliseChannelReference(channelId);
+  if (!reference.id) throw new Error("YouTube RSS requires a channel ID");
+  const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(reference.id)}`, { next: { revalidate: 300 }, headers: { Accept: "application/atom+xml" } });
   if (!response.ok) throw new Error(`YouTube RSS returned ${response.status}`);
   const xml = await response.text();
-  const entries = Array.from(xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)).slice(0, limit);
+  const entries = Array.from(xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g))
+    .map((match) => match[1] ?? "")
+    .sort((a, b) => {
+      const publishedA = a.match(/<published>([^<]+)<\/published>/)?.[1] ?? "";
+      const publishedB = b.match(/<published>([^<]+)<\/published>/)?.[1] ?? "";
+      return Date.parse(publishedB) - Date.parse(publishedA);
+    })
+    .slice(0, limit);
   return entries.flatMap((entry) => {
-    const block = entry[1] ?? "";
-    const id = block.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1];
+    const id = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1];
     if (!id) return [];
-    if (block.includes("/shorts/")) return [];
-    const title = block.match(/<media:title>([\s\S]*?)<\/media:title>/)?.[1] ?? "Latest video";
-    const publishedAt = block.match(/<published>([^<]+)<\/published>/)?.[1] ?? "";
-    const thumbnailUrl = block.match(/<media:thumbnail[^>]+url="([^"]+)"/)?.[1];
+    const title = entry.match(/<media:title>([\s\S]*?)<\/media:title>/)?.[1] ?? "Latest video";
+    const publishedAt = entry.match(/<published>([^<]+)<\/published>/)?.[1] ?? "";
+    const thumbnailUrl = entry.match(/<media:thumbnail[^>]+url="([^"]+)"/)?.[1];
     return [buildVideo(id, decodeXml(title), publishedAt, thumbnailUrl)];
   });
 }
@@ -132,10 +139,11 @@ export async function getLatestYoutubeVideosDetailed(limit = DEFAULT_LIMIT): Pro
     return { videos: [], source: "manual-fallback", diagnostic: "YOUTUBE_CHANNEL_ID is missing" };
   }
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 12);
+  const apiKey = process.env.YOUTUBE_API_KEY?.trim();
   try {
-    if (process.env.YOUTUBE_API_KEY?.trim()) {
+    if (apiKey) {
       try {
-        const videos = await fetchFromApi(channelId, process.env.YOUTUBE_API_KEY.trim(), safeLimit);
+        const videos = await fetchFromApi(channelId, apiKey, safeLimit);
         if (videos.length > 0) {
           console.info(`YouTube feed loaded ${videos.length} videos via Data API`);
           return { videos, source: "youtube" };
@@ -143,18 +151,12 @@ export async function getLatestYoutubeVideosDetailed(limit = DEFAULT_LIMIT): Pro
         console.warn("YouTube Data API returned no videos; trying RSS fallback");
       } catch (error) {
         console.error("YouTube Data API failed; trying RSS fallback", error);
-        const rssVideos = await fetchFromRss(channelId, safeLimit).catch((rssError) => {
-          console.error("YouTube RSS fallback failed", rssError);
-          return [];
-        });
-        if (rssVideos.length > 0) return { videos: rssVideos, source: "rss", diagnostic: "Data API failed; RSS fallback used" };
-        return { videos: [], source: "manual-fallback", diagnostic: error instanceof Error ? error.message : "YouTube Data API failed" };
       }
     }
     const videos = await fetchFromRss(channelId, safeLimit);
     if (videos.length > 0) {
       console.info(`YouTube feed loaded ${videos.length} videos via RSS`);
-      return { videos, source: "rss" };
+      return { videos, source: "rss", diagnostic: apiKey ? "RSS feed used after Data API fallback" : undefined };
     }
     else console.warn("YouTube RSS returned no videos; homepage will use manual videos");
     return { videos: [], source: "manual-fallback", diagnostic: "YouTube RSS returned no videos" };

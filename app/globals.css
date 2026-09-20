@@ -633,6 +633,34 @@ body {
   text-align: center;
 }
 
+@media (max-width: 639px) {
+  .tournament-bracket {
+    overflow-x: visible;
+  }
+
+  .tournament-bracket > div {
+    min-width: 0;
+  }
+
+  .tournament-bracket > div > div {
+    width: 100%;
+  }
+
+  .versus-body {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .versus-side,
+  .versus-side--b {
+    flex-direction: row;
+  }
+
+  .versus-mark {
+    justify-self: center;
+  }
+}
+
 /* --------------------------------------------------------------------------
    Battle Pass Ladder — 5 levels
    Phone: vertical rail.  >=640px: horizontal rail.

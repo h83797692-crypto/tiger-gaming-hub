@@ -34,9 +34,9 @@ function MatchCard({ match }: { match: Match }) {
 
       <div className="space-y-2">
         <div className={`flex items-center justify-between rounded-xl border px-2 py-2 text-sm ${isWinnerA ? "border-emerald-400 bg-emerald-500/15 text-emerald-50" : isLoserA ? "border-red-400 bg-red-500/15 text-red-100" : "border-white/8 bg-white/3 text-white/80"}`}>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <UserAvatar name={match.playerA || "TBD"} avatarUrl={match.avatarA} size="sm" profile={{ username: match.playerA || "TBD", avatarUrl: match.avatarA, frame: match.frameA ?? null, frameEnabled: match.frameEnabledA !== false, xp: match.xpA }} />
-            <span>{match.playerA || "TBD"}</span>
+            <span className="truncate">{match.playerA || "TBD"}</span>
           </div>
           <span className="text-xs text-cyan-300">{match.scoreA}</span>
         </div>
@@ -44,9 +44,9 @@ function MatchCard({ match }: { match: Match }) {
         <div className="flex items-center justify-center text-[10px] font-bold text-white/40">VS</div>
 
         <div className={`flex items-center justify-between rounded-xl border px-2 py-2 text-sm ${isWinnerB ? "border-emerald-400 bg-emerald-500/15 text-emerald-50" : isLoserB ? "border-red-400 bg-red-500/15 text-red-100" : "border-white/8 bg-white/3 text-white/80"}`}>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <UserAvatar name={match.playerB || "TBD"} avatarUrl={match.avatarB} size="sm" profile={{ username: match.playerB || "TBD", avatarUrl: match.avatarB, frame: match.frameB ?? null, frameEnabled: match.frameEnabledB !== false, xp: match.xpB }} />
-            <span>{match.playerB || "TBD"}</span>
+            <span className="truncate">{match.playerB || "TBD"}</span>
           </div>
           <span className="text-xs text-cyan-300">{match.scoreB}</span>
         </div>
@@ -61,10 +61,10 @@ export function TournamentBracket({ rounds }: { rounds: Round[] }) {
   }
 
   return (
-    <div className="w-full overflow-x-auto pb-3">
-      <div className="flex min-w-[760px] gap-4">
+    <div className="tournament-bracket w-full overflow-x-visible pb-3 sm:overflow-x-auto">
+      <div className="flex min-w-0 flex-col gap-4 sm:min-w-[760px] sm:flex-row">
         {rounds.map((round, index) => (
-          <div key={`${round.name}-${index}`} className="flex min-w-[230px] flex-1 flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-[#0b0e14] p-3">
+          <div key={`${round.name}-${index}`} className="flex min-w-0 flex-1 flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-[#0b0e14] p-3 sm:min-w-[230px]">
             <div className="mb-1 flex items-center justify-between rounded-xl bg-cyan-500/10 px-2 py-1 text-[11px] font-bold tracking-[0.2em] text-cyan-300">
               <span>{round.name}</span>
               <span>{round.matches.length}</span>

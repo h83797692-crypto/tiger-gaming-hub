@@ -25,7 +25,21 @@ export function isAdminEmail(email?: string | null) {
   return roleFor(email) === "admin";
 }
 
-export const authOptions: NextAuthOptions = {
+const useSecureCookies = process.env.NODE_ENV === "production";
+
+export const authOptions: NextAuthOptions & { trustHost?: boolean } = {
+  trustHost: true,
+  cookies: {
+    sessionToken: {
+      name: `${useSecureCookies ? "__Secure-" : ""}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+  },
   session: {
     strategy: "jwt",
     maxAge: 60 * 60 * 8, // 8 hours

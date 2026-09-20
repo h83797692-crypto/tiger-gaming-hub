@@ -916,10 +916,10 @@ body {
   inset-inline-start: 0.5rem;
   z-index: 2;
   max-inline-size: calc(100% - 1rem);
-  border: 1px solid rgba(255, 46, 84, 0.45);
+  border: 1px solid rgba(251, 191, 36, 0.6);
   background: rgba(7, 9, 14, 0.9);
   padding: 0.35rem 0.5rem;
-  color: #fda4af;
+  color: #fef3c7;
   font-size: 0.68rem;
 }
 .video-frame--empty {

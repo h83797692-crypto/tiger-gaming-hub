@@ -27,7 +27,7 @@ const clipSchema = z.object({
   description: z.string().trim().max(300).optional().default(""),
 });
 
-function serialiseClip(clip: Record<string, unknown>) {
+function serialiseClip(clip: Record<string, unknown>, userVote: "upvote" | "downvote" | null = null) {
   const upvotes = Number(clip.upvotes ?? clip.votes ?? 0);
   const downvotes = Number(clip.downvotes ?? 0);
   return {
@@ -39,6 +39,7 @@ function serialiseClip(clip: Record<string, unknown>) {
     votes: upvotes - downvotes,
     upvotes,
     downvotes,
+    userVote,
     createdAt: clip.createdAt instanceof Date ? clip.createdAt.toISOString() : String(clip.createdAt ?? ""),
     creator: {
       id: String(clip.userId ?? ""),
@@ -53,8 +54,14 @@ function serialiseClip(clip: Record<string, unknown>) {
 export async function GET() {
   try {
     const db = await getDb();
+    const session = await getServerSession(authOptions).catch(() => null);
     const clips = await db.collection("clips").find({ status: "published" }).sort({ votes: -1, createdAt: -1 }).limit(50).toArray();
-    return NextResponse.json({ clips: clips.map((clip) => serialiseClip(clip as unknown as Record<string, unknown>)) });
+    const clipIds = clips.map((clip) => String(clip._id));
+    const userVotes = session?.user?.id
+      ? await db.collection("clip-votes").find({ userId: session.user.id, clipId: { $in: clipIds } }).toArray()
+      : [];
+    const votesByClipId = new Map(userVotes.map((vote) => [String(vote.clipId), vote.vote === "upvote" || vote.vote === "downvote" ? vote.vote : null]));
+    return NextResponse.json({ clips: clips.map((clip) => serialiseClip(clip as unknown as Record<string, unknown>, votesByClipId.get(String(clip._id)) ?? null)) });
   } catch (error) {
     console.error("Could not load clips", error);
     return NextResponse.json({ error: "تعذر تحميل المقاطع" }, { status: 503 });
@@ -106,18 +113,24 @@ export async function PUT(request: NextRequest) {
     await ensureClipIndexes();
     const clip = await db.collection("clips").findOne({ _id: new (await import("mongodb")).ObjectId(payload.clipId), status: "published" });
     if (!clip) return NextResponse.json({ error: "لم يتم العثور على المقطع" }, { status: 404 });
-    const nextVote = payload.vote === "upvote" ? 1 : -1;
     const existingVote = await db.collection("clip-votes").findOne({ clipId: payload.clipId, userId: session.user.id });
     const previousVote = existingVote?.vote === "downvote" ? -1 : existingVote ? 1 : 0;
+    const removingVote = existingVote?.vote === payload.vote;
+    const nextUserVote = removingVote ? null : payload.vote;
+    const nextVote = nextUserVote === "upvote" ? 1 : nextUserVote === "downvote" ? -1 : 0;
     const voteDelta = nextVote - previousVote;
-    await db.collection("clip-votes").updateOne(
-      { clipId: payload.clipId, userId: session.user.id },
-      { $set: { vote: payload.vote, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
-      { upsert: true }
-    );
+    if (removingVote) {
+      await db.collection("clip-votes").deleteOne({ _id: existingVote?._id });
+    } else {
+      await db.collection("clip-votes").updateOne(
+        { clipId: payload.clipId, userId: session.user.id },
+        { $set: { vote: nextUserVote, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+        { upsert: true }
+      );
+    }
     const updated = await db.collection("clips").findOneAndUpdate(
       { _id: clip._id },
-      { $inc: { votes: voteDelta, upvotes: payload.vote === "upvote" && previousVote !== 1 ? 1 : previousVote === 1 && payload.vote !== "upvote" ? -1 : 0, downvotes: payload.vote === "downvote" && previousVote !== -1 ? 1 : previousVote === -1 && payload.vote !== "downvote" ? -1 : 0 } },
+      { $inc: { votes: voteDelta, upvotes: nextUserVote === "upvote" ? 1 : previousVote === 1 ? -1 : 0, downvotes: nextUserVote === "downvote" ? 1 : previousVote === -1 ? -1 : 0 } },
       { returnDocument: "after" }
     );
     if (updated) {
@@ -129,7 +142,7 @@ export async function PUT(request: NextRequest) {
         await awardXp(String(updated.userId), 50, "comedian");
       }
     }
-    return NextResponse.json({ success: true, votes: Number(updated?.votes ?? clip.votes ?? 0), upvotes: Number(updated?.upvotes ?? 0), downvotes: Number(updated?.downvotes ?? 0), vote: payload.vote });
+    return NextResponse.json({ success: true, votes: Number(updated?.votes ?? clip.votes ?? 0), upvotes: Number(updated?.upvotes ?? 0), downvotes: Number(updated?.downvotes ?? 0), vote: nextUserVote });
   } catch (error) {
     console.error("Could not vote for clip", error);
     return NextResponse.json({ error: "تعذر تسجيل التصويت" }, { status: 503 });

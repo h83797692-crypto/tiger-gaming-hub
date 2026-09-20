@@ -10,7 +10,6 @@ import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { SessionProviderWrapper } from "@/components/admin/SessionProviderWrapper";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { SidebarHud } from "@/components/SidebarHud";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"], variable: "--font-cairo", display: "swap" });
 const chakra = Chakra_Petch({ subsets: ["latin"], variable: "--font-chakra", display: "swap", weight: ["500", "600", "700"] });
@@ -42,7 +41,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <AnimatedBackground />
         <SessionProviderWrapper session={session}>
           <Header siteName={content.brand} socialLinks={siteContent.socialLinks} />
-          <SidebarHud />
           {children}
           <Footer siteName={content.brand} slogan={content.heroSubtitle} socialLinks={siteContent.socialLinks} />
         </SessionProviderWrapper>

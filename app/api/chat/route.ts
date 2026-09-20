@@ -16,7 +16,10 @@ async function ensureChatIndexes() {
   chatIndexReady ??= getDb().then((db) => db.collection("chat-messages").createIndex(
     { roomId: 1, createdAt: -1 },
     { name: "room_created_at" }
-  ));
+  ).then(async () => db.collection("chat-messages").createIndex(
+    { createdAt: 1 },
+    { name: "chat_message_expiry", expireAfterSeconds: 300 }
+  )));
   await chatIndexReady;
 }
 
@@ -59,7 +62,7 @@ function serialiseMessage(document: Record<string, unknown>, userDocument?: Reco
 
 async function loadMessages(roomId: string) {
   const db = await getDb();
-  const messages = await db.collection("chat-messages").find({ roomId }).sort({ createdAt: -1 }).limit(80).toArray();
+  const messages = await db.collection("chat-messages").find({ roomId, createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) } }).sort({ createdAt: -1 }).limit(80).toArray();
   const ordered = messages.reverse();
   const userIds = Array.from(new Set(ordered.map((message) => String(message.userId ?? "")).filter(Boolean)));
   const users = userIds.length ? await db.collection("users").find({ userId: { $in: userIds } }, { projection: { userId: 1, roles: 1, role: 1, lastSeenAt: 1 } }).toArray() : [];

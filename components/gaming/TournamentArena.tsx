@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useEffect } from "react";
 import type { Game, Tournament } from "@/lib/gaming-content";
 import { RegistrationModal } from "@/components/gaming/RegistrationModal";
+import { LiveChatRoom } from "@/components/gaming/LiveChatRoom";
 import { isPubgTournament, type PubgTeamResult } from "@/lib/pubg-scrims";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -17,6 +18,7 @@ export function TournamentArena({ tournaments, games }: { tournaments: Tournamen
   const [registeredCount, setRegisteredCount] = useState(0);
   const [pubgResults, setPubgResults] = useState<PubgTeamResult[]>([]);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const tournament = tournaments.find((item) => item.id === selectedId) ?? tournaments[0];
 
   useEffect(() => {
@@ -33,17 +35,20 @@ export function TournamentArena({ tournaments, games }: { tournaments: Tournamen
     return () => { active = false; };
   }, [tournament]);
 
+  useEffect(() => {
+    setChatOpen(false);
+  }, [tournament.id]);
+
   if (!tournament) return null;
 
   return (
-    <>
-      <div className="tournament-meta">
-        <label htmlFor="tournament-view-select">البطولة</label>
-        <select id="tournament-view-select" className="admin-select" value={tournament.id} onChange={(event) => setSelectedId(event.target.value)}>
-          {tournaments.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-        </select>
-      </div>
-      <article className="hud-panel tournament-card">
+    <article className="hud-panel tournament-card">
+        <div className="tournament-meta">
+          <label htmlFor="tournament-view-select">البطولة</label>
+          <select id="tournament-view-select" className="admin-select" value={tournament.id} onChange={(event) => setSelectedId(event.target.value)}>
+            {tournaments.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+          </select>
+        </div>
         <div className="tournament-meta">
           <span className={`status status--${tournament.status}`}>
             {STATUS_LABEL[tournament.status] ?? tournament.status}
@@ -67,8 +72,11 @@ export function TournamentArena({ tournaments, games }: { tournaments: Tournamen
         <button type="button" className="tournament-join-button" onClick={() => setRegistrationOpen(true)}>
           تسجيل في البطولة <span aria-hidden="true">↗</span>
         </button>
+        <button type="button" className="tournament-join-button" onClick={() => setChatOpen((current) => !current)} aria-expanded={chatOpen}>
+          {chatOpen ? "إخفاء الشات" : "إظهار الشات"}
+        </button>
+        {chatOpen && <LiveChatRoom roomId={tournament.id} />}
         {registrationOpen && <RegistrationModal tournament={tournament} games={games} onClose={() => setRegistrationOpen(false)} />}
-      </article>
-    </>
+    </article>
   );
 }

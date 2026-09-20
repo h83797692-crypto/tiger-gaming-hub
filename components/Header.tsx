@@ -11,6 +11,7 @@ const NAV = [
   { href: "/", label: "الرئيسية", icon: Home, tone: "cyan" },
   { href: "/#games", label: "الألعاب", icon: Gamepad2, tone: "orange" },
   { href: "/#tournaments", label: "البطولات", icon: Trophy, tone: "amber", badge: "NEW" },
+  { href: "/#clips", label: "تواصل", icon: CircleHelp, tone: "cyan" },
   { href: "/#battle-pass", label: "باتل باس", icon: Zap, tone: "pink" },
   { href: "/#media", label: "الفيديو", icon: Video, tone: "violet" },
   { href: "/rewards", label: "متجر XP", icon: ShoppingBag, tone: "amber" },
@@ -57,8 +58,9 @@ export function Header({ siteName, socialLinks }: { siteName: string; socialLink
   };
 
   return (
-    <header className="site-header sticky top-0 z-50">
-      <div className="site-header__bar flex items-center justify-between gap-3 py-3 md:py-4">
+    <>
+      <header className="site-header sticky top-0 z-50">
+      <div className="site-header__bar header-container flex items-center justify-between gap-3 py-3 md:py-4">
         <Link href="/" className="tiger-logo text-xl font-black uppercase tracking-widest sm:text-2xl md:text-3xl">
           {siteName}
         </Link>
@@ -67,9 +69,6 @@ export function Header({ siteName, socialLinks }: { siteName: string; socialLink
           {NAV.map((item) => <Link key={item.href} href={item.href} className="site-header__link">{item.label}</Link>)}
         </nav>
 
-        <button type="button" className="site-header__menu inline-grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-400/40 bg-cyan-400/10 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.12)]" onClick={() => setIsDrawerOpen(true)} aria-label="فتح القائمة" aria-expanded={isDrawerOpen} aria-controls="site-navigation-drawer">
-          <Menu size={20} aria-hidden="true" />
-        </button>
       </div>
 
       {mounted && createPortal(<div className={`site-drawer fixed inset-0 z-[10000] ${isDrawerOpen ? "is-open visible pointer-events-auto" : "invisible pointer-events-none"}`} aria-hidden={!isDrawerOpen}>
@@ -140,6 +139,10 @@ export function Header({ siteName, socialLinks }: { siteName: string; socialLink
           </div>
         </aside>
       </div>, document.body)}
-    </header>
+      </header>
+      <button type="button" className="site-header__menu sidebar-toggle-btn inline-grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-400/40 bg-cyan-400/10 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.12)]" onClick={() => setIsDrawerOpen(true)} aria-label="فتح القائمة" aria-expanded={isDrawerOpen} aria-controls="site-navigation-drawer">
+        <Menu size={20} aria-hidden="true" />
+      </button>
+    </>
   );
 }

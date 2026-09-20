@@ -38,7 +38,7 @@ export function YouTubeEmbed({
   const videoId = getYoutubeId(youtubeUrl);
   const { data: session, status, update } = useSession();
   const containerRef = useRef<HTMLDivElement>(null);
-  const hostRef = useRef<HTMLIFrameElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YoutubePlayer | null>(null);
   const readyRef = useRef(false);
   const watchSessionRef = useRef<string | null>(null);
@@ -154,15 +154,6 @@ export function YouTubeEmbed({
   }
 
   if (videoId && origin) {
-    const embedParams = new URLSearchParams({
-      enablejsapi: "1",
-      modestbranding: "1",
-      origin,
-      playsinline: "1",
-      rel: "0",
-      widget_referrer: window.location.href,
-    });
-
     return (
       <div ref={containerRef} className="video-frame youtube-player-frame">
         {!isActivated && <>
@@ -176,15 +167,7 @@ export function YouTubeEmbed({
             تشغيل الفيديو
           </button>
         </>}
-        {isActivated && shouldLoad && <iframe
-            ref={hostRef}
-            title={title}
-            src={`https://www.youtube.com/embed/${videoId}?${embedParams.toString()}`}
-            loading="lazy"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-          />}
+        {isActivated && shouldLoad && <div ref={hostRef} title={title} />}
         {status === "authenticated" && session?.user?.provider === "google" && (isPlaying || watchXp > 0) && <AnimatedXP value={watchXp} className="youtube-watch-notice" />}
         {notice && <small className="youtube-watch-notice">{notice}</small>}
       </div>

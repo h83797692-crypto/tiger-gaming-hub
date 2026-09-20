@@ -24,9 +24,11 @@ export function getPubgPoints(placement: number, kills: number) {
 
 export function buildPubgResults(
   registrations: Array<{ teamId?: string; teamName?: string; playerName?: string; inGameId?: string; teamMembers?: string[] }>,
-  saved: Array<Partial<PubgTeamResult>> = []
+  saved: Array<Partial<PubgTeamResult>> = [],
+  configuredTeams: Array<{ teamId: string; teamName: string }> = []
 ): PubgTeamResult[] {
   const teams = new Map<string, { teamId: string; teamName: string; members: string[] }>();
+  configuredTeams.forEach((team) => teams.set(team.teamId, { ...team, members: [] }));
   registrations.forEach((registration, index) => {
     const teamId = registration.teamId || `solo-${index}`;
     const current = teams.get(teamId) ?? {

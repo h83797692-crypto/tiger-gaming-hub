@@ -132,12 +132,14 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
   const [newSize, setNewSize] = useState("4");
   const [newRegistrationType, setNewRegistrationType] = useState<"custom" | "random">("random");
   const [newCustomTeams, setNewCustomTeams] = useState("");
+  const [newTeamLimit, setNewTeamLimit] = useState("20");
 
   const gameTournaments = useMemo(
     () => tournamentList.filter((item) => item.game === selectedGame),
     [selectedGame, tournamentList]
   );
   const tournament = tournamentList.find((item) => item.id === selectedTournament);
+  const isCustomPubgTournament = Boolean(tournament && isPubgTournament(tournament.game) && tournament.registrationType === "custom");
 
   useEffect(() => {
     if (!gameTournaments.some((item) => item.id === selectedTournament)) {
@@ -217,13 +219,17 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
 
   const createTournament = async () => {
     const customTeams = Array.from(new Set(newCustomTeams.split(/[\n,]+/).map((team) => team.trim()).filter(Boolean)));
-    const maxPlayers = newRegistrationType === "custom" ? customTeams.length : Number(newSize);
+    const maxPlayers = newRegistrationType === "custom" ? Number(newTeamLimit) : Number(newSize);
     if (!newGame || !newTitle.trim() || !Number.isInteger(maxPlayers) || maxPlayers < 1) {
       setCreateError("اختر اللعبة واكتب اسم البطولة واختر سعة صحيحة.");
       return;
     }
     if (isPubgTournament(newGame) && newRegistrationType === "custom" && customTeams.length < 1) {
       setCreateError("أدخل اسم فريق PUBG واحداً على الأقل.");
+      return;
+    }
+    if (isPubgTournament(newGame) && newRegistrationType === "custom" && maxPlayers > customTeams.length) {
+      setCreateError("لا يمكن أن يتجاوز الحد الأقصى عدد الفرق المدخلة.");
       return;
     }
 
@@ -348,30 +354,30 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
       </p>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="rounded-lg border border-amber-400/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" onClick={() => setCreateOpen(true)}>
+        {!isCustomPubgTournament && <button type="button" className="rounded-lg border border-amber-400/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" onClick={() => setCreateOpen(true)}>
           توليد شجرة بطولة جديدة
-        </button>
-        <label className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-white/70">
+        </button>}
+        {!isCustomPubgTournament && <label className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-white/70">
           سعة البطولة
           <select className="bg-transparent text-cyan-200 outline-none" value={bracketSize} onChange={(event) => setBracketSize(Number(event.target.value))}>
             {[4, 8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}
           </select>
-        </label>
-        <button type="button" className="rounded-lg border border-cyan-400/50 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200" onClick={generateBracket}>
+        </label>}
+        {!isCustomPubgTournament && <button type="button" className="rounded-lg border border-cyan-400/50 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200" onClick={generateBracket}>
           توليد شجرة البطولة
-        </button>
-        <button type="button" className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" onClick={startTournament} disabled={savingBracket || visible.length === 0}>
+        </button>}
+        {!isCustomPubgTournament && <button type="button" className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" onClick={startTournament} disabled={savingBracket || visible.length === 0}>
           بدء البطولة من المسجلين
-        </button>
+        </button>}
         <button type="button" className="rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white/80" onClick={deleteTournament} disabled={deletingTournament || !selectedTournament}>
           {deletingTournament ? "جارٍ الحذف..." : "حذف البطولة"}
         </button>
-        <button type="button" className="rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white/80" onClick={() => setBracketRounds(buildSingleEliminationBracket([]))}>
+        {!isCustomPubgTournament && <button type="button" className="rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm text-white/80" onClick={() => setBracketRounds(buildSingleEliminationBracket([]))}>
           إعادة تعيين
-        </button>
-        <button type="button" className="rounded-lg border border-emerald-400/50 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200" onClick={saveBracket} disabled={savingBracket}>
+        </button>}
+        {!isCustomPubgTournament && <button type="button" className="rounded-lg border border-emerald-400/50 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200" onClick={saveBracket} disabled={savingBracket}>
           {savingBracket ? "جارٍ الحفظ..." : "حفظ الشجرة"}
-        </button>
+        </button>}
       </div>
 
       {isCreateOpen && (
@@ -391,7 +397,10 @@ export function RosterViewer({ tournaments, games }: { tournaments: Tournament[]
               <label className="admin-field">طبيعة التسجيل<select className="admin-select" value={newRegistrationType} onChange={(event) => setNewRegistrationType(event.target.value as "custom" | "random")}><option value="random">عشوائية</option>{isPubgTournament(newGame) && <option value="custom">فرق مخصصة</option>}</select></label>
               {newRegistrationType === "random" && <label className="admin-field">عدد اللاعبين / السعة<select className="admin-select" value={newSize} onChange={(event) => setNewSize(event.target.value)}>{[4, 8, 16, 32, 64].map((size) => <option key={size} value={size}>{size} لاعب</option>)}</select></label>}
             </div>
-            {newRegistrationType === "custom" && isPubgTournament(newGame) && <label className="admin-field mt-4">أسماء فرق PUBG المخصصة<textarea className="admin-input min-h-32" value={newCustomTeams} onChange={(event) => setNewCustomTeams(event.target.value)} placeholder="اكتب فريقاً في كل سطر" /></label>}
+            {newRegistrationType === "custom" && isPubgTournament(newGame) && <>
+              <label className="admin-field">الحد الأقصى لعدد الفرق<input className="admin-input" type="number" min={1} max={100} value={newTeamLimit} onChange={(event) => setNewTeamLimit(event.target.value)} /></label>
+              <label className="admin-field mt-4">أسماء فرق PUBG المخصصة<textarea rows={20} className="admin-input min-h-32" value={newCustomTeams} onChange={(event) => setNewCustomTeams(event.target.value)} placeholder="اكتب فريقاً في كل سطر" /></label>
+            </>}
               <p className="mt-4 rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3 text-sm text-cyan-100">سيتم إدخال المشاركين تلقائياً من نموذج التسجيل في الموقع عند اكتمال السعة.</p>
             {createError && <p className="mt-3 text-sm text-red-300">{createError}</p>}
             <div className="mt-5 flex justify-end gap-2">

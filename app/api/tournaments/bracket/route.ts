@@ -157,6 +157,8 @@ export async function GET(request: NextRequest) {
 
     const db = await getDb();
     const doc = await db.collection("tournament-brackets").findOne({ tournamentId });
+    const gamingContent = await db.collection("gaming").findOne({ _id: "gaming-content" as any });
+    const configuredTournament = (gamingContent as any)?.tournaments?.find((item: { id: string }) => item.id === tournamentId);
     const registrations = await db
       .collection("tournament-registrations")
       .find({ tournamentId })
@@ -169,8 +171,17 @@ export async function GET(request: NextRequest) {
       rounds: hydratedRounds,
       maxPlayers: doc?.maxPlayers,
       registrations: registrations.map(({ _id, ...registration }) => ({ ...registration, id: _id.toString() })),
-      pubgResults: isPubgTournament(String((await db.collection("gaming").findOne({ _id: "gaming-content" as any }))?.tournaments?.find((item: { id: string }) => item.id === tournamentId)?.game ?? ""))
-        ? buildPubgResults(registrations as Array<Record<string, unknown>>, (doc?.pubgResults ?? []) as Array<Partial<PubgTeamResult>>)
+      pubgResults: isPubgTournament(String(configuredTournament?.game ?? ""))
+        ? buildPubgResults(
+            registrations as Array<Record<string, unknown>>,
+            (doc?.pubgResults ?? []) as Array<Partial<PubgTeamResult>>,
+            configuredTournament?.registrationType === "custom"
+              ? (configuredTournament.customTeams ?? []).slice(0, Number(configuredTournament.maxPlayers ?? 0)).map((teamName: string) => ({
+                  teamName,
+                  teamId: `${tournamentId}:${encodeURIComponent(teamName.toLowerCase())}`,
+                }))
+              : []
+          )
         : undefined,
     });
   } catch (error) {
@@ -239,7 +250,16 @@ export async function PUT(request: NextRequest) {
       const configuredTournament = (tournamentDoc as any)?.tournaments?.find((item: { id: string }) => item.id === pubgPayload.data.tournamentId);
       if (configuredTournament && isPubgTournament(configuredTournament.game)) {
         const registrations = await db.collection("tournament-registrations").find({ tournamentId: pubgPayload.data.tournamentId }).toArray();
-        const results = buildPubgResults(registrations as Array<Record<string, unknown>>, pubgPayload.data.pubgResults);
+        const results = buildPubgResults(
+          registrations as Array<Record<string, unknown>>,
+          pubgPayload.data.pubgResults,
+          configuredTournament?.registrationType === "custom"
+            ? (configuredTournament.customTeams ?? []).slice(0, Number(configuredTournament.maxPlayers ?? 0)).map((teamName: string) => ({
+                teamName,
+                teamId: `${pubgPayload.data.tournamentId}:${encodeURIComponent(teamName.toLowerCase())}`,
+              }))
+            : []
+        );
         await db.collection("tournament-brackets").updateOne(
           { tournamentId: pubgPayload.data.tournamentId },
           { $set: { tournamentId: pubgPayload.data.tournamentId, pubgResults: results, updatedAt: new Date() } },

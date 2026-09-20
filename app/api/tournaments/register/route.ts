@@ -35,6 +35,10 @@ export async function POST(request: NextRequest) {
       { tournamentId: 1, teamId: 1 },
       { name: "unique_tournament_team_lock", unique: true, partialFilterExpression: { teamId: { $type: "string" } } }
     );
+    await db.collection("tournament-registrations").createIndex(
+      { tournamentId: 1, teamLeaderId: 1 },
+      { name: "unique_custom_team_leader_lock", unique: true, partialFilterExpression: { teamLeaderId: { $type: "string" } } }
+    );
     const session = await getServerSession(authOptions).catch(() => null);
     const profile = session?.user?.id ? await getUserProfile(session.user.id) : null;
     const tournament = await db.collection("gaming").findOne({ _id: "gaming-content" as any });
@@ -44,14 +48,19 @@ export async function POST(request: NextRequest) {
     const isGenerals = parsed.data.gameId === "generals-zero-hour";
     const isPubg = /pubg/i.test(parsed.data.game);
     const registrationType = configuredTournament?.registrationType === "custom" ? "custom" : "random";
-    const customTeams = Array.isArray(configuredTournament?.customTeams) ? configuredTournament.customTeams as string[] : [];
+    if (isPubg && registrationType === "custom" && !session?.user?.id) {
+      return NextResponse.json({ error: "يجب تسجيل الدخول بحساب Google لحجز تيم PUBG." }, { status: 401 });
+    }
+    const customTeams = Array.isArray(configuredTournament?.customTeams)
+      ? (configuredTournament.customTeams as string[]).slice(0, Math.max(0, Number(configuredTournament?.maxPlayers ?? 0)))
+      : [];
     if (isPubg && registrationType === "custom" && !customTeams.includes(parsed.data.customTeamName)) {
       return NextResponse.json({ error: "اختر فريقاً من الفرق المخصصة لهذه البطولة." }, { status: 400 });
     }
     if (isPubg && parsed.data.mode === "squad" && registrationType === "random" && !parsed.data.teamName) {
       return NextResponse.json({ error: "أدخل اسم الفريق وأسماء ثلاثة أعضاء للـ Squad." }, { status: 400 });
     }
-    if (isPubg && parsed.data.mode === "squad" && parsed.data.teamMembers.length !== 3) {
+    if (isPubg && registrationType === "random" && parsed.data.mode === "squad" && parsed.data.teamMembers.length !== 3) {
       return NextResponse.json({ error: "أدخل أسماء ثلاثة أعضاء للـ Squad." }, { status: 400 });
     }
     if (isGenerals && !parsed.data.faction) {
@@ -85,6 +94,10 @@ export async function POST(request: NextRequest) {
     if (teamId && await db.collection("tournament-registrations").findOne({ tournamentId: parsed.data.tournamentId, teamId })) {
       return NextResponse.json({ error: "اسم الفريق مسجل مسبقاً في هذه البطولة." }, { status: 409 });
     }
+    const teamLeaderId = isPubg && registrationType === "custom" ? String(session?.user?.id ?? "") : undefined;
+    if (teamLeaderId && await db.collection("tournament-registrations").findOne({ tournamentId: parsed.data.tournamentId, teamLeaderId })) {
+      return NextResponse.json({ error: "يمكن لقائد الفريق حجز تيم واحد فقط في هذه البطولة." }, { status: 409 });
+    }
     const batch = Math.floor(registrationCount / maxEntries) + 1;
     const slot = (registrationCount % maxEntries) + 1;
 
@@ -92,6 +105,7 @@ export async function POST(request: NextRequest) {
       ...parsed.data,
       teamName,
       teamId,
+      teamLeaderId,
       playerName: profile?.username || parsed.data.playerName,
       userId: session?.user?.id,
       profileUsername: profile?.username,
@@ -140,6 +154,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === 11000) {
+      if ("keyPattern" in error && error.keyPattern && typeof error.keyPattern === "object" && "teamLeaderId" in error.keyPattern) {
+        return NextResponse.json({ error: "يمكن لقائد الفريق حجز تيم واحد فقط في هذه البطولة." }, { status: 409 });
+      }
       return NextResponse.json({ error: "هذا التيم تم تسجيله مسبقاً ولا يمكن حجزه مجدداً." }, { status: 409 });
     }
     console.error("Tournament registration failed", error);
@@ -164,7 +181,9 @@ export async function GET(request: NextRequest) {
       const maxEntries = Math.max(1, Math.floor(maxPlayers / teamSize));
       const registrations = await db.collection("tournament-registrations").find({ tournamentId }).toArray();
       const isCustom = configuredTournament?.registrationType === "custom";
-      const customTeams = Array.isArray(configuredTournament?.customTeams) ? configuredTournament.customTeams as string[] : [];
+      const customTeams = Array.isArray(configuredTournament?.customTeams)
+        ? (configuredTournament.customTeams as string[]).slice(0, Math.max(0, Number(configuredTournament?.maxPlayers ?? 0)))
+        : [];
       const occupiedTeams = new Set(registrations.map((registration) => String(registration.teamId ?? "")).filter(Boolean));
       const registrationByTeam = new Map(registrations.map((registration) => [String(registration.teamId ?? ""), registration]));
       const count = isCustom ? occupiedTeams.size : registrations.length;

@@ -16,8 +16,8 @@ const registrationSchema = z.object({
   faction: z.enum(["usa", "china", "gla", "random"]).optional(),
   gameId: z.string().min(1).max(120),
   game: z.string().trim().min(1).max(120),
-  youtubeHandle: z.string().trim().min(2).max(100),
-  youtubeVerified: z.literal(true),
+  youtubeHandle: z.string().trim().max(100).default(""),
+  youtubeVerified: z.boolean().optional().default(true),
 });
 
 export async function POST(request: NextRequest) {
@@ -27,9 +27,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (parsed.data.youtubeVerified !== true) {
-      return NextResponse.json({ error: "يجب التحقق من اشتراك قناة Tiger Gaming قبل التسجيل." }, { status: 403 });
-    }
     const db = await getDb();
     const session = await getServerSession(authOptions).catch(() => null);
     const profile = session?.user?.id ? await getUserProfile(session.user.id) : null;

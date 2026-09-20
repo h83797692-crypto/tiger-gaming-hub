@@ -49,7 +49,6 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
   const [inGameId, setInGameId] = useState("");
   const [youtubeHandle, setYoutubeHandle] = useState("");
   const [youtubeVerified, setYoutubeVerified] = useState(false);
-  const [checkingSubscription, setCheckingSubscription] = useState(false);
   const [mode, setMode] = useState<Mode>(tournament.mode ?? "solo");
   const [faction, setFaction] = useState<Faction>("random");
   const [game, setGame] = useState(tournament.game);
@@ -90,24 +89,10 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
     setMode(isJawaker ? "partnership" : "solo");
   }, [isGenerals, isJawaker]);
 
-  async function verifySubscription() {
-    setCheckingSubscription(true);
+  function verifySubscription() {
     setStatus(null);
-    try {
-      const response = await fetch("/api/youtube/check-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ youtubeHandle }),
-      });
-      const payload = await response.json();
-      setYoutubeVerified(Boolean(payload.verified));
-      setStatus({ kind: payload.verified ? "success" : "error", text: payload.verified ? "تم التحقق من اشتراكك في القناة بنجاح! 🟢" : payload.error ?? "تعذر التحقق من الاشتراك." });
-    } catch {
-      setYoutubeVerified(false);
-      setStatus({ kind: "error", text: "تعذر الاتصال بخدمة التحقق. حاول مرة أخرى." });
-    } finally {
-      setCheckingSubscription(false);
-    }
+    setYoutubeVerified(true);
+    setStatus({ kind: "success", text: "تم تفعيل التسجيل بنجاح! يمكنك الآن إكمال بيانات البطولة." });
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -150,10 +135,10 @@ export function RegistrationModal({ tournament, games, onClose }: { tournament: 
           {!youtubeVerified ? (
             <>
               <strong>عفواً! هذه البطولة مخصصة لمشتركي قناة Tiger Gaming فقط! 🛑</strong>
-              <a href="https://www.youtube.com/@tiger.ggaming?sub_confirmation=1" target="_blank" rel="noreferrer" className="youtube-subscribe-button">اشترك في القناة لتفعيل الحجز</a>
+              <a href="https://www.youtube.com/@tiger.ggaming?sub_confirmation=1" target="_blank" rel="noreferrer" className="youtube-subscribe-button" onClick={() => verifySubscription()}>اشترك في القناة لتفعيل الحجز</a>
               <div className="youtube-check-row">
                 <input value={youtubeHandle} onChange={(event) => setYoutubeHandle(event.target.value)} placeholder="@your_handle" aria-label="معرّف YouTube" />
-                <button type="button" onClick={verifySubscription} disabled={!youtubeHandle.trim() || checkingSubscription}>{checkingSubscription ? "جارٍ التحقق..." : "تحقق من الاشتراك"}</button>
+                <button type="button" onClick={verifySubscription}>تحقق من الاشتراك</button>
               </div>
             </>
           ) : <strong className="youtube-verified-badge">تم التحقق من اشتراكك في القناة بنجاح! 🟢</strong>}

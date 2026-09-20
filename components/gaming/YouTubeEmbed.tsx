@@ -37,6 +37,7 @@ export function YouTubeEmbed({
 }) {
   const videoId = getYoutubeId(youtubeUrl);
   const { data: session, status, update } = useSession();
+  const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLIFrameElement>(null);
   const playerRef = useRef<YoutubePlayer | null>(null);
   const readyRef = useRef(false);
@@ -45,6 +46,7 @@ export function YouTubeEmbed({
   const lastHeartbeatRef = useRef(0);
   const [notice, setNotice] = useState("");
   const [origin, setOrigin] = useState("");
+  const [shouldLoad, setShouldLoad] = useState(false);
   const [watchXp, setWatchXp] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -53,7 +55,22 @@ export function YouTubeEmbed({
   }, []);
 
   useEffect(() => {
-    if (!videoId || !origin || !hostRef.current) return;
+    if (!videoId || shouldLoad || !containerRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "300px 0px" }
+    );
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [videoId, shouldLoad]);
+
+  useEffect(() => {
+    if (!videoId || !origin || !shouldLoad || !hostRef.current) return;
     let active = true;
     let timer: number | undefined;
     setWatchXp(0);
@@ -128,7 +145,7 @@ export function YouTubeEmbed({
     const visibility = () => { if (readyRef.current && playerRef.current && watchSessionRef.current) void send("heartbeat", playerRef.current); };
     document.addEventListener("visibilitychange", visibility);
     return () => { active = false; document.removeEventListener("visibilitychange", visibility); if (timer) window.clearInterval(timer); if (readyRef.current && playerRef.current) void send("stop", playerRef.current); readyRef.current = false; playerRef.current?.destroy(); playerRef.current = null; };
-  }, [videoId, session?.user?.provider, status, origin]);
+  }, [videoId, session?.user?.provider, status, origin, shouldLoad, update]);
 
   if (videoId && origin) {
     const embedParams = new URLSearchParams({
@@ -141,15 +158,16 @@ export function YouTubeEmbed({
     });
 
     return (
-      <div className="video-frame youtube-player-frame">
-        <iframe
-          ref={hostRef}
-          title={title}
-          src={`https://www.youtube.com/embed/${videoId}?${embedParams.toString()}`}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
+      <div ref={containerRef} className="video-frame youtube-player-frame">
+        {shouldLoad && <iframe
+            ref={hostRef}
+            title={title}
+            src={`https://www.youtube.com/embed/${videoId}?${embedParams.toString()}`}
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+          />}
         {status === "authenticated" && session?.user?.provider === "google" && (isPlaying || watchXp > 0) && <AnimatedXP value={watchXp} className="youtube-watch-notice" />}
         {notice && <small className="youtube-watch-notice">{notice}</small>}
       </div>

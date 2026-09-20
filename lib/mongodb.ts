@@ -1,4 +1,4 @@
-import { MongoClient, type Db } from "mongodb";
+import { MongoClient, type ClientSession, type Db } from "mongodb";
 
 declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
@@ -33,4 +33,21 @@ function getClientPromise(): Promise<MongoClient> {
 export async function getDb(): Promise<Db> {
   const client = await getClientPromise();
   return client.db();
+}
+
+export async function withMongoTransaction<T>(
+  operation: (db: Db, session: ClientSession) => Promise<T>
+): Promise<T> {
+  const client = await getClientPromise();
+  const session = client.startSession();
+
+  try {
+    let result!: T;
+    await session.withTransaction(async () => {
+      result = await operation(client.db(), session);
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }

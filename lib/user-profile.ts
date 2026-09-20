@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/mongodb";
+import type { ClientSession, Db } from "mongodb";
 import type { PlayerBadge } from "@/lib/engagement";
 import { normaliseRoles, type CommunityRole } from "@/lib/roles";
 
@@ -91,14 +92,15 @@ export async function updateUserProfile(userId: string, patch: Pick<UserProfile,
   return getUserProfile(userId);
 }
 
-export async function grantChampionFrame(userId: string) {
+export async function grantChampionFrame(userId: string, context?: { db?: Db; session?: ClientSession }) {
   if (!userId) return;
-  const db = await getDb();
+  const db = context?.db ?? await getDb();
   await db.collection("users").updateOne(
     { userId },
     {
       $set: { frame: "champion", frameEnabled: true, updatedAt: new Date() },
       $addToSet: { badges: { id: "champion", label: "بطل الساحة", description: "فاز بالمركز الأول في بطولة.", icon: "🏆", earnedAt: new Date().toISOString() } },
-    } as any
+    } as any,
+    context?.session ? { session: context.session } : undefined
   );
 }

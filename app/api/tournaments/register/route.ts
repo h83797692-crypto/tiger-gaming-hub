@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
+import { withMongoTransaction } from "@/lib/mongodb";
 import { getUserProfile } from "@/lib/user-profile";
 import { buildSingleEliminationBracket } from "@/lib/tournament-bracket";
 
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
     const batch = Math.floor(registrationCount / maxEntries) + 1;
     const slot = (registrationCount % maxEntries) + 1;
 
-    await db.collection("tournament-registrations").insertOne({
+    const registration = {
       ...parsed.data,
       teamName,
       teamId,
@@ -115,30 +116,37 @@ export async function POST(request: NextRequest) {
       batch,
       slot,
       createdAt: new Date(),
-    });
+    };
 
     if (slot === maxEntries && configuredTournament && registrationType !== "custom") {
-      const completedRegistrations = await db
-        .collection("tournament-registrations")
-        .find({ tournamentId: parsed.data.tournamentId })
-        .sort({ createdAt: 1 })
-        .limit(maxPlayers)
-        .toArray();
-      const rounds = buildSingleEliminationBracket(
-        completedRegistrations.map((registration) => registration.playerName || registration.inGameId),
-        ["الدور الأول", "نصف النهائي", "النهائي"],
-        maxPlayers
-      );
+      await withMongoTransaction(async (transactionDb, transactionSession) => {
+        await transactionDb.collection("tournament-registrations").insertOne(registration, { session: transactionSession });
+        const completedRegistrations = await transactionDb
+          .collection("tournament-registrations")
+          .find({ tournamentId: parsed.data.tournamentId }, { session: transactionSession })
+          .sort({ createdAt: 1 })
+          .limit(maxPlayers)
+          .toArray();
+        const rounds = buildSingleEliminationBracket(
+          completedRegistrations.map((item) => item.playerName || item.inGameId),
+          ["الدور الأول", "نصف النهائي", "النهائي"],
+          maxPlayers
+        );
 
-      await db.collection("tournament-brackets").updateOne(
-        { tournamentId: parsed.data.tournamentId },
-        { $set: { tournamentId: parsed.data.tournamentId, rounds, maxPlayers, updatedAt: new Date() } },
-        { upsert: true }
-      );
-      await db.collection("gaming").updateOne(
-        { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
-        { $set: { "tournaments.$.rounds": rounds, updatedAt: new Date() } }
-      );
+        await transactionDb.collection("tournament-brackets").updateOne(
+          { tournamentId: parsed.data.tournamentId },
+          { $set: { tournamentId: parsed.data.tournamentId, rounds, maxPlayers, updatedAt: new Date() } },
+          { upsert: true, session: transactionSession }
+        );
+
+        await transactionDb.collection("gaming").updateOne(
+          { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
+          { $set: { "tournaments.$.rounds": rounds, updatedAt: new Date() } },
+          { session: transactionSession }
+        );
+      });
+    } else {
+      await db.collection("tournament-registrations").insertOne(registration);
     }
 
     return NextResponse.json({

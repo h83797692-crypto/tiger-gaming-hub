@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { getDb } from "@/lib/mongodb";
+import { getDb, withMongoTransaction } from "@/lib/mongodb";
 import { grantChampionFrame } from "@/lib/user-profile";
+import type { ClientSession, Db } from "mongodb";
 import type { BracketRound } from "@/lib/tournament-bracket";
 import { buildPubgResults, isPubgTournament, type PubgTeamResult } from "@/lib/pubg-scrims";
 
@@ -55,10 +56,19 @@ const createTournamentSchema = z.object({
   customTeams: z.array(z.string().trim().min(1).max(80)).max(100).default([]),
 });
 
-async function hydrateRounds(rounds: BracketRound[], registrations: Array<Record<string, unknown>>) {
-  const db = await getDb();
+async function hydrateRounds(
+  rounds: BracketRound[],
+  registrations: Array<Record<string, unknown>>,
+  context?: { db?: Db; session?: ClientSession }
+) {
+  const db = context?.db ?? await getDb();
   const userIds = registrations.map((registration) => String(registration.userId ?? "")).filter(Boolean);
-  const profiles = userIds.length > 0 ? await db.collection("users").find({ userId: { $in: userIds } }).toArray() : [];
+  const profiles = userIds.length > 0
+    ? await db.collection("users").find(
+        { userId: { $in: userIds } },
+        context?.session ? { session: context.session } : undefined
+      ).toArray()
+    : [];
   const profileById = new Map(profiles.map((profile) => [String(profile.userId), profile]));
   const registrationByName = new Map(registrations.flatMap((registration) => {
     const profile = registration.userId ? profileById.get(String(registration.userId)) : undefined;
@@ -130,16 +140,21 @@ export async function POST(request: NextRequest) {
       rounds,
     };
 
-    await db.collection("gaming").updateOne(
-      { _id: "gaming-content" as any },
-      { $push: { tournaments: tournament } as any, $set: { updatedAt: new Date() } },
-      { upsert: true }
-    );
-    await db.collection("tournament-brackets").insertOne({
-      tournamentId,
-      rounds,
-      maxPlayers: parsed.data.maxPlayers,
-      updatedAt: new Date(),
+    await withMongoTransaction(async (transactionDb, transactionSession) => {
+      await transactionDb.collection("gaming").updateOne(
+        { _id: "gaming-content" as any },
+        { $push: { tournaments: tournament } as any, $set: { updatedAt: new Date() } },
+        { upsert: true, session: transactionSession }
+      );
+      await transactionDb.collection("tournament-brackets").insertOne(
+        {
+          tournamentId,
+          rounds,
+          maxPlayers: parsed.data.maxPlayers,
+          updatedAt: new Date(),
+        },
+        { session: transactionSession }
+      );
     });
 
     return NextResponse.json({ success: true, tournament });
@@ -204,14 +219,15 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const db = await getDb();
-    await Promise.all([
-      db.collection("tournament-brackets").deleteOne({ tournamentId }),
-      db.collection("tournament-registrations").deleteMany({ tournamentId }),
-      db.collection("gaming").updateOne(
+    await withMongoTransaction(async (transactionDb, transactionSession) => {
+      await transactionDb.collection("tournament-brackets").deleteOne({ tournamentId }, { session: transactionSession });
+      await transactionDb.collection("tournament-registrations").deleteMany({ tournamentId }, { session: transactionSession });
+      await transactionDb.collection("gaming").updateOne(
         { _id: "gaming-content" as any },
-        { $pull: { tournaments: { id: tournamentId } } as any, $set: { updatedAt: new Date() } }
-      ),
-    ]);
+        { $pull: { tournaments: { id: tournamentId } } as any, $set: { updatedAt: new Date() } },
+        { session: transactionSession }
+      );
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -281,57 +297,78 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const db = await getDb();
-    const registrations = await db.collection("tournament-registrations").find({ tournamentId: parsed.data.tournamentId }).toArray();
-    if (registrations.length < 4) {
-      return NextResponse.json({ error: "تحتاج البطولة إلى 4 لاعبين على الأقل قبل بدء الشجرة." }, { status: 400 });
-    }
-    const hydratedRounds = await hydrateRounds(parsed.data.rounds as BracketRound[], registrations as Array<Record<string, unknown>>);
-    const result = await db.collection("tournament-brackets").updateOne(
-      { tournamentId: parsed.data.tournamentId },
-      { $set: { tournamentId: parsed.data.tournamentId, rounds: hydratedRounds, updatedAt: new Date() } },
-      { upsert: true }
-    );
+    const transactionResult = await withMongoTransaction(async (transactionDb, transactionSession) => {
+      const registrations = await transactionDb.collection("tournament-registrations")
+        .find({ tournamentId: parsed.data.tournamentId }, { session: transactionSession })
+        .toArray();
+      if (registrations.length < 4) return { error: true as const };
 
-    const tournamentUpdate: Record<string, unknown> = {
-      "tournaments.$.rounds": hydratedRounds,
-      updatedAt: new Date(),
-    };
-    if (parsed.data.maxPlayers !== undefined) tournamentUpdate["tournaments.$.maxPlayers"] = parsed.data.maxPlayers;
-
-    await db.collection("gaming").updateOne(
-      { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
-      { $set: tournamentUpdate }
-    );
-
-    const finalMatch = hydratedRounds.at(-1)?.matches.at(-1);
-    const championName = finalMatch?.status === "done"
-      ? finalMatch.winner || (finalMatch.scoreA > finalMatch.scoreB ? finalMatch.playerA : finalMatch.scoreB > finalMatch.scoreA ? finalMatch.playerB : "")
-      : "";
-    if (championName && championName !== "TBD" && championName !== "BYE") {
-      const championRegistration = await db.collection("tournament-registrations").findOne({
-        tournamentId: parsed.data.tournamentId,
-        $or: [{ playerName: championName }, { inGameId: championName }],
-      });
-      if (championRegistration?.userId) await grantChampionFrame(String(championRegistration.userId));
-    }
-
-    const finalRounds = championName ? await hydrateRounds(hydratedRounds, registrations as Array<Record<string, unknown>>) : hydratedRounds;
-    if (championName) {
-      await db.collection("tournament-brackets").updateOne(
+      const hydratedRounds = await hydrateRounds(
+        parsed.data.rounds as BracketRound[],
+        registrations as Array<Record<string, unknown>>,
+        { db: transactionDb, session: transactionSession }
+      );
+      const result = await transactionDb.collection("tournament-brackets").updateOne(
         { tournamentId: parsed.data.tournamentId },
-        { $set: { rounds: finalRounds, updatedAt: new Date() } }
+        { $set: { tournamentId: parsed.data.tournamentId, rounds: hydratedRounds, updatedAt: new Date() } },
+        { upsert: true, session: transactionSession }
       );
-      await db.collection("gaming").updateOne(
+
+      const tournamentUpdate: Record<string, unknown> = {
+        "tournaments.$.rounds": hydratedRounds,
+        updatedAt: new Date(),
+      };
+      if (parsed.data.maxPlayers !== undefined) tournamentUpdate["tournaments.$.maxPlayers"] = parsed.data.maxPlayers;
+
+      await transactionDb.collection("gaming").updateOne(
         { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
-        { $set: { "tournaments.$.rounds": finalRounds, updatedAt: new Date() } }
+        { $set: tournamentUpdate },
+        { session: transactionSession }
       );
+
+      const finalMatch = hydratedRounds.at(-1)?.matches.at(-1);
+      const championName = finalMatch?.status === "done"
+        ? finalMatch.winner || (finalMatch.scoreA > finalMatch.scoreB ? finalMatch.playerA : finalMatch.scoreB > finalMatch.scoreA ? finalMatch.playerB : "")
+        : "";
+      if (championName && championName !== "TBD" && championName !== "BYE") {
+        const championRegistration = await transactionDb.collection("tournament-registrations").findOne(
+          {
+            tournamentId: parsed.data.tournamentId,
+            $or: [{ playerName: championName }, { inGameId: championName }],
+          },
+          { session: transactionSession }
+        );
+        if (championRegistration?.userId) {
+          await grantChampionFrame(String(championRegistration.userId), { db: transactionDb, session: transactionSession });
+        }
+      }
+
+      const finalRounds = championName
+        ? await hydrateRounds(hydratedRounds, registrations as Array<Record<string, unknown>>, { db: transactionDb, session: transactionSession })
+        : hydratedRounds;
+      if (championName) {
+        await transactionDb.collection("tournament-brackets").updateOne(
+          { tournamentId: parsed.data.tournamentId },
+          { $set: { rounds: finalRounds, updatedAt: new Date() } },
+          { session: transactionSession }
+        );
+        await transactionDb.collection("gaming").updateOne(
+          { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
+          { $set: { "tournaments.$.rounds": finalRounds, updatedAt: new Date() } },
+          { session: transactionSession }
+        );
+      }
+
+      return { result, finalRounds };
+    });
+    if ("error" in transactionResult) {
+      return NextResponse.json({ error: "تحتاج البطولة إلى 4 لاعبين على الأقل قبل بدء الشجرة." }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      updated: result.modifiedCount > 0 || result.upsertedCount > 0,
-      rounds: finalRounds,
+      updated: transactionResult.result.modifiedCount > 0 || transactionResult.result.upsertedCount > 0,
+      rounds: transactionResult.finalRounds,
     });
   } catch (error) {
     console.error("Could not save tournament bracket", error);

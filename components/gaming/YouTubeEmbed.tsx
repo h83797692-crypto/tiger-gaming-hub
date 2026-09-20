@@ -47,6 +47,7 @@ export function YouTubeEmbed({
   const [notice, setNotice] = useState("");
   const [origin, setOrigin] = useState("");
   const [shouldLoad, setShouldLoad] = useState(false);
+  const [isActivated, setIsActivated] = useState(false);
   const [watchXp, setWatchXp] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -55,7 +56,7 @@ export function YouTubeEmbed({
   }, []);
 
   useEffect(() => {
-    if (!videoId || shouldLoad || !containerRef.current) return;
+    if (!videoId || shouldLoad || isActivated || !containerRef.current) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
@@ -67,10 +68,10 @@ export function YouTubeEmbed({
     );
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [videoId, shouldLoad]);
+  }, [videoId, shouldLoad, isActivated]);
 
   useEffect(() => {
-    if (!videoId || !origin || !shouldLoad || !hostRef.current) return;
+    if (!videoId || !origin || !shouldLoad || !isActivated || !hostRef.current) return;
     let active = true;
     let timer: number | undefined;
     setWatchXp(0);
@@ -145,7 +146,12 @@ export function YouTubeEmbed({
     const visibility = () => { if (readyRef.current && playerRef.current && watchSessionRef.current) void send("heartbeat", playerRef.current); };
     document.addEventListener("visibilitychange", visibility);
     return () => { active = false; document.removeEventListener("visibilitychange", visibility); if (timer) window.clearInterval(timer); if (readyRef.current && playerRef.current) void send("stop", playerRef.current); readyRef.current = false; playerRef.current?.destroy(); playerRef.current = null; };
-  }, [videoId, session?.user?.provider, status, origin, shouldLoad, update]);
+  }, [videoId, session?.user?.provider, status, origin, shouldLoad, isActivated, update]);
+
+  function activatePlayer() {
+    setIsActivated(true);
+    setShouldLoad(true);
+  }
 
   if (videoId && origin) {
     const embedParams = new URLSearchParams({
@@ -159,7 +165,18 @@ export function YouTubeEmbed({
 
     return (
       <div ref={containerRef} className="video-frame youtube-player-frame">
-        {shouldLoad && <iframe
+        {!isActivated && <>
+          <img
+            src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+            alt={title}
+            loading="lazy"
+            className="video-frame"
+          />
+          <button type="button" className="youtube-watch-notice" onClick={activatePlayer} aria-label={`تشغيل ${title}`}>
+            تشغيل الفيديو
+          </button>
+        </>}
+        {isActivated && shouldLoad && <iframe
             ref={hostRef}
             title={title}
             src={`https://www.youtube.com/embed/${videoId}?${embedParams.toString()}`}

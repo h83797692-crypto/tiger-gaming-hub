@@ -114,12 +114,14 @@ export function YouTubeEmbed({
       }
     };
     const startWatchSession = (player: YoutubePlayer) => {
-      if (watchSessionRef.current || sessionStartingRef.current) return;
+      if (watchSessionRef.current) return Promise.resolve(true);
+      if (sessionStartingRef.current) return sessionStartingRef.current;
       sessionStartingRef.current = (async () => {
         const refreshedSession = await updateRef.current();
         if (refreshedSession?.user?.provider !== "google") return false;
         return send("start", player);
       })().finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
+      return sessionStartingRef.current;
     };
     void loadYoutubeApi().then((YT) => {
       if (!active || !hostRef.current) return;
@@ -136,11 +138,15 @@ export function YouTubeEmbed({
           onReady: () => {
             readyRef.current = true;
             playerRef.current = player;
-            startWatchSession(player);
+            void startWatchSession(player).catch(() => setNotice("تعذر بدء جلسة احتساب XP"));
           },
           onStateChange: (event) => {
             setIsPlaying(event.data === 1);
-            if (event.data === 1) startWatchSession(player);
+            if (event.data === 1) {
+              void startWatchSession(player)
+                .then(() => send("heartbeat", player))
+                .catch(() => setNotice("تعذر بدء جلسة احتساب XP"));
+            }
           },
           onError: (event) => {
             readyRef.current = false;

@@ -91,10 +91,11 @@ export async function awardXp(userId: string, amount: number, badge?: BadgeId) {
   if (!userId || !Number.isInteger(amount) || amount <= 0) throw new Error("Invalid XP award");
   const db = await getDb();
   const badgeUpdate = badge ? { $addToSet: { badges: getBadge(badge) } } : {};
-  await db.collection("users").updateOne(
+  const result = await db.collection("users").updateOne(
     { userId },
     { $inc: { xp: amount }, ...badgeUpdate, $set: { updatedAt: new Date() } } as any
   );
+  if (result.matchedCount === 0) throw new Error(`User profile not found for XP award: ${userId}`);
   const profile = await getUserProfile(userId);
   if (profile && profile.xp >= 1200 && !(profile.badges ?? []).some((item) => item.id === "clutch")) {
     await db.collection("users").updateOne({ userId }, { $addToSet: { badges: getBadge("clutch") } } as any);

@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
   const now = new Date();
 
   if (input.action === "start") {
+    console.info("[YouTube XP] Watch session started", { videoId: input.videoId, provider: session.user.provider });
     const sessionId = randomUUID();
     await db.collection("youtube-watch-sessions").updateMany(
       { userId: session.user.id, invalid: false, stoppedAt: { $exists: false } },
@@ -94,6 +95,9 @@ export async function POST(request: NextRequest) {
   );
   if (!updated) return NextResponse.json({ error: "تم رفض heartbeat مكرر" }, { status: 409 });
 
-  if (addedXp > 0) await awardXp(session.user.id, addedXp);
+  if (addedXp > 0) {
+    await awardXp(session.user.id, addedXp);
+    console.info("[YouTube XP] XP awarded", { videoId: input.videoId, amount: addedXp });
+  }
   return NextResponse.json({ creditedSeconds: Number(updated.creditedSeconds ?? 0), addedXp, earnedXp: Number(updated.creditedSeconds ?? 0) * settings.watch_xp_per_minute / 60 });
 }

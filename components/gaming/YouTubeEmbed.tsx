@@ -136,6 +136,8 @@ export function YouTubeEmbed({
       sessionStartingRef.current = (async () => {
         const refreshedSession = await updateRef.current();
         if (refreshedSession?.user?.provider !== "google") return false;
+        authRef.current = { status: "authenticated", provider: refreshedSession.user.provider };
+        console.info("[YouTube XP] Starting watch session", { videoId });
         return send("start", player);
       })().finally(() => { sessionStartingRef.current = null; }).then(() => Boolean(watchSessionRef.current));
       return sessionStartingRef.current;
@@ -151,6 +153,7 @@ export function YouTubeEmbed({
       heartbeatTimer = window.setInterval(() => {
         if (readyRef.current && playerRef.current && watchSessionRef.current && player.getPlayerState() === 1 && Date.now() - lastHeartbeatRef.current > 3500) {
           lastHeartbeatRef.current = Date.now();
+          console.info("[YouTube XP] Sending heartbeat", { videoId, currentTime: player.getCurrentTime() });
           void send("heartbeat", player);
         }
       }, 4000);

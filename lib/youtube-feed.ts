@@ -66,7 +66,7 @@ async function fetchFromApi(channelId: string, apiKey: string, limit: number) {
   if (reference.handle) channelUrl.searchParams.set("forHandle", reference.handle);
   else channelUrl.searchParams.set("id", reference.id ?? channelId);
   channelUrl.searchParams.set("key", apiKey);
-  const channelResponse = await fetch(channelUrl, { next: { revalidate: 300 }, headers: { Accept: "application/json" } });
+  const channelResponse = await fetch(channelUrl, { cache: "no-store", headers: { Accept: "application/json" } });
   if (!channelResponse.ok) {
     const error = await channelResponse.json().catch(() => ({})) as { error?: { message?: string } };
     throw new Error(`YouTube channels.list returned ${channelResponse.status}: ${error.error?.message ?? "unknown API error"}`);
@@ -80,7 +80,7 @@ async function fetchFromApi(channelId: string, apiKey: string, limit: number) {
   playlistUrl.searchParams.set("playlistId", uploadsId);
   playlistUrl.searchParams.set("maxResults", String(Math.min(limit * 4, 50)));
   playlistUrl.searchParams.set("key", apiKey);
-  const response = await fetch(playlistUrl, { next: { revalidate: 300 }, headers: { Accept: "application/json" } });
+  const response = await fetch(playlistUrl, { cache: "no-store", headers: { Accept: "application/json" } });
   if (!response.ok) {
     const error = await response.json().catch(() => ({})) as { error?: { message?: string } };
     throw new Error(`YouTube playlistItems.list returned ${response.status}: ${error.error?.message ?? "unknown API error"}`);
@@ -96,7 +96,7 @@ async function fetchFromApi(channelId: string, apiKey: string, limit: number) {
   detailsUrl.searchParams.set("part", "contentDetails");
   detailsUrl.searchParams.set("id", candidates.map((video) => video.youtubeId).join(","));
   detailsUrl.searchParams.set("key", apiKey);
-  const detailsResponse = await fetch(detailsUrl, { next: { revalidate: 300 }, headers: { Accept: "application/json" } });
+  const detailsResponse = await fetch(detailsUrl, { cache: "no-store", headers: { Accept: "application/json" } });
   if (!detailsResponse.ok) {
     const error = await detailsResponse.json().catch(() => ({})) as { error?: { message?: string } };
     throw new Error(`YouTube videos.list returned ${detailsResponse.status}: ${error.error?.message ?? "unknown API error"}`);
@@ -111,7 +111,7 @@ async function fetchFromApi(channelId: string, apiKey: string, limit: number) {
 async function fetchFromRss(channelId: string, limit: number) {
   const reference = normaliseChannelReference(channelId);
   if (!reference.id) throw new Error("YouTube RSS requires a channel ID");
-  const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(reference.id)}`, { next: { revalidate: 300 }, headers: { Accept: "application/atom+xml" } });
+  const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(reference.id)}`, { cache: "no-store", headers: { Accept: "application/atom+xml" } });
   if (!response.ok) throw new Error(`YouTube RSS returned ${response.status}`);
   const xml = await response.text();
   const entries = Array.from(xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g))

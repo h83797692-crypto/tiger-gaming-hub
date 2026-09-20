@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Clapperboard, RefreshCw, Trophy } from "lucide-react";
+import { Clapperboard, RefreshCw, Trash2, Trophy } from "lucide-react";
 
 type Clip = { id: string; title: string; votes: number; creator: { name: string }; url: string };
 export function EngagementDashboard() {
@@ -16,9 +16,15 @@ export function EngagementDashboard() {
   }
   useEffect(() => { void refresh(); }, []);
 
+  async function deleteClip(clipId: string) {
+    if (!window.confirm("هل تريد حذف هذا المقطع؟")) return;
+    const response = await fetch(`/api/clips?clipId=${encodeURIComponent(clipId)}`, { method: "DELETE" });
+    if (response.ok) setClips((current) => current.filter((clip) => clip.id !== clipId));
+  }
+
   return <div className="engagement-admin admin-stack" dir="rtl">
     <div className="admin-block"><p className="admin-hint">تتم إدارة قيم جميع المهمات من قسم «قيم المهام» لتجنب وجود قيم ثابتة متعارضة.</p></div>
-    <div className="admin-block"><div className="admin-block__heading"><h4><Clapperboard size={17} /> مقاطع المجتمع</h4><button type="button" className="admin-refresh" onClick={refresh} disabled={loading}><RefreshCw size={15} /> تحديث</button></div>{clips.length === 0 ? <p className="admin-hint">لا توجد مقاطع منشورة بعد.</p> : <div className="clip-admin-list">{clips.map((clip) => <article key={clip.id}><a href={clip.url} target="_blank" rel="noreferrer">{clip.title}</a><span>{clip.creator.name}</span><b>{clip.votes} تصويت</b></article>)}</div>}</div>
+    <div className="admin-block"><div className="admin-block__heading"><h4><Clapperboard size={17} /> مقاطع المجتمع</h4><button type="button" className="admin-refresh" onClick={refresh} disabled={loading}><RefreshCw size={15} /> تحديث</button></div>{clips.length === 0 ? <p className="admin-hint">لا توجد مقاطع منشورة بعد.</p> : <div className="clip-admin-list">{clips.map((clip) => <article key={clip.id}><a href={clip.url} target="_blank" rel="noreferrer">{clip.title}</a><span>{clip.creator.name}</span><b>{clip.votes} تصويت</b><button type="button" className="admin-refresh" onClick={() => void deleteClip(clip.id)} aria-label="حذف المقطع"><Trash2 size={15} /> حذف</button></article>)}</div>}</div>
     <div className="admin-block engagement-admin__note"><Trophy size={18} /><p>الفائز الأسبوعي هو الأعلى تصويتًا. عند بلوغ 10 أصوات يحصل صاحبه على +50 XP ووسام «مهرج الموسم» تلقائيًا.</p></div>
   </div>;
 }

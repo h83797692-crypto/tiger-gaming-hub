@@ -28,13 +28,17 @@ const clipSchema = z.object({
 });
 
 function serialiseClip(clip: Record<string, unknown>) {
+  const upvotes = Number(clip.upvotes ?? clip.votes ?? 0);
+  const downvotes = Number(clip.downvotes ?? 0);
   return {
     id: String(clip._id ?? ""),
     title: String(clip.title ?? ""),
     url: String(clip.url ?? ""),
     mediaType: clip.mediaType === "image" ? "image" : "video",
     description: String(clip.description ?? ""),
-    votes: Number(clip.votes ?? 0),
+    votes: upvotes - downvotes,
+    upvotes,
+    downvotes,
     createdAt: clip.createdAt instanceof Date ? clip.createdAt.toISOString() : String(clip.createdAt ?? ""),
     creator: {
       id: String(clip.userId ?? ""),
@@ -93,18 +97,29 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "سجّل الدخول للتصويت" }, { status: 401 });
-  const payload = await request.json().catch(() => null) as { clipId?: string } | null;
+  const payload = await request.json().catch(() => null) as { clipId?: string; vote?: "upvote" | "downvote" } | null;
   if (!payload?.clipId || payload.clipId.length > 100) return NextResponse.json({ error: "المقطع غير صالح" }, { status: 400 });
+  if (payload.vote !== "upvote" && payload.vote !== "downvote") return NextResponse.json({ error: "نوع التصويت غير صالح" }, { status: 400 });
 
   try {
     const db = await getDb();
     await ensureClipIndexes();
     const clip = await db.collection("clips").findOne({ _id: new (await import("mongodb")).ObjectId(payload.clipId), status: "published" });
     if (!clip) return NextResponse.json({ error: "لم يتم العثور على المقطع" }, { status: 404 });
+    const nextVote = payload.vote === "upvote" ? 1 : -1;
     const existingVote = await db.collection("clip-votes").findOne({ clipId: payload.clipId, userId: session.user.id });
-    if (existingVote) return NextResponse.json({ error: "صوّت لهذا المقطع مسبقًا" }, { status: 409 });
-    await db.collection("clip-votes").insertOne({ clipId: payload.clipId, userId: session.user.id, createdAt: new Date() });
-    const updated = await db.collection("clips").findOneAndUpdate({ _id: clip._id }, { $inc: { votes: 1 } }, { returnDocument: "after" });
+    const previousVote = existingVote?.vote === "downvote" ? -1 : existingVote ? 1 : 0;
+    const voteDelta = nextVote - previousVote;
+    await db.collection("clip-votes").updateOne(
+      { clipId: payload.clipId, userId: session.user.id },
+      { $set: { vote: payload.vote, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+    const updated = await db.collection("clips").findOneAndUpdate(
+      { _id: clip._id },
+      { $inc: { votes: voteDelta, upvotes: payload.vote === "upvote" && previousVote !== 1 ? 1 : previousVote === 1 && payload.vote !== "upvote" ? -1 : 0, downvotes: payload.vote === "downvote" && previousVote !== -1 ? 1 : previousVote === -1 && payload.vote !== "downvote" ? -1 : 0 } },
+      { returnDocument: "after" }
+    );
     if (updated) {
       const total = Number(updated.votes ?? 0);
       const creator = await getUserProfile(String(updated.userId));
@@ -114,9 +129,31 @@ export async function PUT(request: NextRequest) {
         await awardXp(String(updated.userId), 50, "comedian");
       }
     }
-    return NextResponse.json({ success: true, votes: Number(updated?.votes ?? clip.votes ?? 0) });
+    return NextResponse.json({ success: true, votes: Number(updated?.votes ?? clip.votes ?? 0), upvotes: Number(updated?.upvotes ?? 0), downvotes: Number(updated?.downvotes ?? 0), vote: payload.vote });
   } catch (error) {
     console.error("Could not vote for clip", error);
     return NextResponse.json({ error: "تعذر تسجيل التصويت" }, { status: 503 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions).catch(() => null);
+  if (session?.user?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const clipId = request.nextUrl.searchParams.get("clipId");
+  if (!clipId || !ObjectId.isValid(clipId)) return NextResponse.json({ error: "المقطع غير صالح" }, { status: 400 });
+
+  try {
+    const db = await getDb();
+    const clip = await db.collection("clips").findOne({ _id: new ObjectId(clipId) });
+    if (!clip) return NextResponse.json({ error: "لم يتم العثور على المقطع" }, { status: 404 });
+    await db.collection("clips").deleteOne({ _id: clip._id });
+    await db.collection("clip-votes").deleteMany({ clipId });
+    if (clip.mediaId && ObjectId.isValid(String(clip.mediaId))) {
+      await db.collection("media").deleteOne({ _id: new ObjectId(String(clip.mediaId)) });
+    }
+    return NextResponse.json({ success: true, clipId });
+  } catch (error) {
+    console.error("Could not delete clip", error);
+    return NextResponse.json({ error: "تعذر حذف المقطع" }, { status: 503 });
   }
 }

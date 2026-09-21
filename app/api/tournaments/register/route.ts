@@ -32,14 +32,6 @@ export async function POST(request: NextRequest) {
 
   try {
     const db = await getDb();
-    await db.collection("tournament-registrations").createIndex(
-      { tournamentId: 1, teamId: 1 },
-      { name: "unique_tournament_team_lock", unique: true, partialFilterExpression: { teamId: { $type: "string" } } }
-    );
-    await db.collection("tournament-registrations").createIndex(
-      { tournamentId: 1, teamLeaderId: 1 },
-      { name: "unique_custom_team_leader_lock", unique: true, partialFilterExpression: { teamLeaderId: { $type: "string" } } }
-    );
     const session = await getServerSession(authOptions).catch(() => null);
     const profile = session?.user?.id ? await getUserProfile(session.user.id) : null;
     const tournament = await db.collection("gaming").findOne({ _id: "gaming-content" as any });
@@ -81,13 +73,6 @@ export async function POST(request: NextRequest) {
     const maxPlayers = Math.max(1, Number(configuredTournament?.maxPlayers ?? 8));
     const teamSize = isPubg ? (parsed.data.mode === "squad" ? 4 : parsed.data.mode === "duo" ? 2 : 1) : 1;
     const maxEntries = registrationType === "custom" ? customTeams.length : Math.max(1, Math.floor(maxPlayers / teamSize));
-    const registrations = await db.collection("tournament-registrations").find({ tournamentId: parsed.data.tournamentId }).toArray();
-    const registrationCount = registrationType === "custom"
-      ? new Set(registrations.map((registration) => String(registration.teamId ?? "")).filter(Boolean)).size
-      : registrations.length;
-    if (registrationCount >= maxEntries) {
-      return NextResponse.json({ error: "اكتمل التسجيل في هذه البطولة." }, { status: 409 });
-    }
     const teamName = registrationType === "custom" ? parsed.data.customTeamName : parsed.data.teamName;
     const teamId = isPubg && (parsed.data.mode === "squad" || registrationType === "custom")
       ? `${parsed.data.tournamentId}:${encodeURIComponent(teamName.toLowerCase())}`
@@ -99,28 +84,85 @@ export async function POST(request: NextRequest) {
     if (teamLeaderId && await db.collection("tournament-registrations").findOne({ tournamentId: parsed.data.tournamentId, teamLeaderId })) {
       return NextResponse.json({ error: "يمكن لقائد الفريق حجز تيم واحد فقط في هذه البطولة." }, { status: 409 });
     }
-    const batch = Math.floor(registrationCount / maxEntries) + 1;
-    const slot = (registrationCount % maxEntries) + 1;
 
-    const registration = {
-      ...parsed.data,
-      teamName,
-      teamId,
-      teamLeaderId,
-      playerName: profile?.username || parsed.data.playerName,
-      userId: session?.user?.id,
-      profileUsername: profile?.username,
-      profileAvatarUrl: profile?.avatarUrl,
-      profileFrame: profile?.frame,
-      profileFrameEnabled: profile?.frameEnabled,
-      batch,
-      slot,
-      createdAt: new Date(),
-    };
+    let finalSlot = 0;
+    let finalBatch = 0;
+    let finalIsFull = false;
+    let finalRegistrationCount = 0;
 
-    if (slot === maxEntries && configuredTournament && registrationType !== "custom") {
-      await withMongoTransaction(async (transactionDb, transactionSession) => {
-        await transactionDb.collection("tournament-registrations").insertOne(registration, { session: transactionSession });
+    await withMongoTransaction(async (transactionDb, transactionSession) => {
+      const tournamentDoc = await transactionDb.collection("gaming").findOne(
+        { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
+        { session: transactionSession }
+      );
+      const tournamentItem = (tournamentDoc as any)?.tournaments?.find((item: { id: string }) => item.id === parsed.data.tournamentId);
+
+      if (typeof tournamentItem?.registeredCount !== "number") {
+        const registrations = await transactionDb
+          .collection("tournament-registrations")
+          .find({ tournamentId: parsed.data.tournamentId }, { session: transactionSession })
+          .toArray();
+        const actualCount = registrationType === "custom"
+          ? new Set(registrations.map((registration) => String(registration.teamId ?? "")).filter(Boolean)).size
+          : registrations.length;
+
+        await transactionDb.collection("gaming").updateOne(
+          { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
+          {
+            $set: {
+              "tournaments.$.registeredCount": Math.min(actualCount, maxEntries),
+              updatedAt: new Date(),
+            },
+          },
+          { session: transactionSession }
+        );
+      }
+
+      const incrementResult = await transactionDb.collection("gaming").updateOne(
+        {
+          _id: "gaming-content" as any,
+          "tournaments.id": parsed.data.tournamentId,
+          "tournaments.$.registeredCount": { $lt: maxEntries },
+        },
+        { $inc: { "tournaments.$.registeredCount": 1 } },
+        { session: transactionSession }
+      );
+
+      if (incrementResult.matchedCount === 0 || incrementResult.modifiedCount === 0) {
+        throw Object.assign(new Error("REGISTRATION_LIMIT_REACHED"), { statusCode: 409 });
+      }
+
+      const updatedTournamentDoc = await transactionDb.collection("gaming").findOne(
+        { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
+        { session: transactionSession }
+      );
+      const updatedTournament = (updatedTournamentDoc as any)?.tournaments?.find(
+        (item: { id: string }) => item.id === parsed.data.tournamentId
+      );
+      finalRegistrationCount = Number(updatedTournament?.registeredCount ?? 0);
+      finalBatch = Math.floor(finalRegistrationCount / maxEntries) + 1;
+      finalSlot = (finalRegistrationCount % maxEntries) + 1;
+      finalIsFull = finalRegistrationCount >= maxEntries;
+
+      const registration = {
+        ...parsed.data,
+        teamName,
+        teamId,
+        teamLeaderId,
+        playerName: profile?.username || parsed.data.playerName,
+        userId: session?.user?.id,
+        profileUsername: profile?.username,
+        profileAvatarUrl: profile?.avatarUrl,
+        profileFrame: profile?.frame,
+        profileFrameEnabled: profile?.frameEnabled,
+        batch: finalBatch,
+        slot: finalSlot,
+        createdAt: new Date(),
+      };
+
+      await transactionDb.collection("tournament-registrations").insertOne(registration, { session: transactionSession });
+
+      if (finalIsFull && configuredTournament && registrationType !== "custom") {
         const completedRegistrations = await transactionDb
           .collection("tournament-registrations")
           .find({ tournamentId: parsed.data.tournamentId }, { session: transactionSession })
@@ -141,26 +183,33 @@ export async function POST(request: NextRequest) {
 
         await transactionDb.collection("gaming").updateOne(
           { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
-          { $set: { "tournaments.$.rounds": rounds, updatedAt: new Date() } },
+          { $set: { "tournaments.$.rounds": rounds, "tournaments.$.registeredCount": finalRegistrationCount, updatedAt: new Date() } },
           { session: transactionSession }
         );
-      });
-    } else {
-      await db.collection("tournament-registrations").insertOne(registration);
-    }
+      } else {
+        await transactionDb.collection("gaming").updateOne(
+          { _id: "gaming-content" as any, "tournaments.id": parsed.data.tournamentId },
+          { $set: { "tournaments.$.registeredCount": finalRegistrationCount, updatedAt: new Date() } },
+          { session: transactionSession }
+        );
+      }
+    });
 
     return NextResponse.json({
       success: true,
-      slot,
-      batch,
+      slot: finalSlot,
+      batch: finalBatch,
       maxPlayers,
       teamSize,
-      isFull: slot === maxEntries,
-      count: slot,
+      isFull: finalIsFull,
+      count: finalSlot,
       registrationType,
-      message: slot === maxEntries ? "اكتملت سعة التسجيل." : "تم حجز مقعدك بنجاح.",
+      message: finalIsFull ? "اكتملت سعة التسجيل." : "تم حجز مقعدك بنجاح.",
     });
   } catch (error) {
+    if (error && typeof error === "object" && "statusCode" in error && error.statusCode === 409) {
+      return NextResponse.json({ error: "اكتمل التسجيل في هذه البطولة." }, { status: 409 });
+    }
     if (error && typeof error === "object" && "code" in error && error.code === 11000) {
       if ("keyPattern" in error && error.keyPattern && typeof error.keyPattern === "object" && "teamLeaderId" in error.keyPattern) {
         return NextResponse.json({ error: "يمكن لقائد الفريق حجز تيم واحد فقط في هذه البطولة." }, { status: 409 });
@@ -248,7 +297,40 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "لا يمكنك إلغاء حجز تيم لا تملكه" }, { status: 403 });
     }
 
-    await db.collection("tournament-registrations").deleteMany({ tournamentId, teamId });
+    await withMongoTransaction(async (transactionDb, transactionSession) => {
+      const tournamentDoc = await transactionDb.collection("gaming").findOne(
+        { _id: "gaming-content" as any, "tournaments.id": tournamentId },
+        { session: transactionSession }
+      );
+      const tournamentItem = (tournamentDoc as any)?.tournaments?.find((item: { id: string }) => item.id === tournamentId);
+      const registrationType = tournamentItem?.registrationType === "custom" ? "custom" : "random";
+      const removedRegistrations = await transactionDb
+        .collection("tournament-registrations")
+        .find({ tournamentId, teamId }, { session: transactionSession })
+        .toArray();
+
+      const deleteResult = await transactionDb.collection("tournament-registrations").deleteMany(
+        { tournamentId, teamId },
+        { session: transactionSession }
+      );
+
+      if (deleteResult.deletedCount > 0) {
+        const decrementValue = registrationType === "custom"
+          ? Math.max(1, new Set(removedRegistrations.map((item) => String(item.teamId ?? "")).filter(Boolean)).size)
+          : 1;
+
+        await transactionDb.collection("gaming").updateOne(
+          {
+            _id: "gaming-content" as any,
+            "tournaments.id": tournamentId,
+            "tournaments.$.registeredCount": { $gt: 0 },
+          },
+          { $inc: { "tournaments.$.registeredCount": -decrementValue } },
+          { session: transactionSession }
+        );
+      }
+    });
+
     return NextResponse.json({ success: true, teamId });
   } catch (error) {
     console.error("Could not cancel tournament registration", error);

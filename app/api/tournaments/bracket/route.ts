@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
         ? Array.from(new Set(parsed.data.customTeams.map((team) => team.trim()).filter(Boolean)))
         : [],
       rules: isPubgTournament(parsed.data.game) ? "PUBG Custom Room · Placement + Kills" : "Single elimination · 1v1",
+      registeredCount: 0,
       rounds,
     };
 
